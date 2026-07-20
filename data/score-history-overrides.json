@@ -1,0 +1,3 @@
+{
+  "_comment": "Fallback for when live GHIN score-history fetching isn't working. Key each entry by GHIN number (as a string) with an array of recent score differentials, oldest first, e.g. \"1234567\": [12.4, 10.1, 14.2]. getScoreHistory() in src/lib/ghin.ts falls back to this file if the live call fails."
+}
