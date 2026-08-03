@@ -1,0 +1,32 @@
+{
+  "strokeAllowancePct": 0.9,
+  "rounds": [
+    {
+      "round": "Friday AM",
+      "format": "2-Man Best Ball",
+      "course": "Palmetto Dunes - Robert Trent Jones",
+      "tees": "Blue",
+      "rating": 72.8,
+      "slope": 137,
+      "par": 72
+    },
+    {
+      "round": "Friday PM",
+      "format": "2-Man Best Ball",
+      "course": "Palmetto Dunes - Arthur Hills",
+      "tees": "Blue/White",
+      "rating": 72.4,
+      "slope": 135,
+      "par": 72
+    },
+    {
+      "round": "Saturday",
+      "format": "Singles",
+      "course": "Hilton Head National",
+      "tees": "Blue",
+      "rating": 70,
+      "slope": 124,
+      "par": 71
+    }
+  ]
+}

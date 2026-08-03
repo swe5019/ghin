@@ -1,8 +1,8 @@
 # Deploying the GHIN Draft Assistant
 
-This is a personal, single-user tool — no auth system, no database. Deploying it just
-means putting the Next.js app somewhere reachable from a browser and giving it your
-GHIN login as environment variables.
+This is a personal, single-user tool — no auth system, no database. It reads a
+committed spreadsheet file (`data/BCIV_Draft.xlsx`), so deploying it just means
+putting the Next.js app somewhere reachable from a browser.
 
 ## 1. Push the repo to GitHub (if not already)
 
@@ -12,55 +12,35 @@ Vercel deploys from a Git repo.
 
 1. Go to https://vercel.com/new and import this repository.
 2. Framework preset: Next.js (auto-detected).
-3. Before the first deploy, add the environment variables below.
+3. No environment variables are required for the app itself.
 
-## 3. Required environment variables
+## 3. Keeping the roster current
 
-Set these in the Vercel project's **Settings → Environment Variables** (add to both
-Production and Preview if you use preview deployments):
+The roster comes from `data/BCIV_Draft.xlsx`, synced from OneDrive by
+`.github/workflows/sync-players.yml` (uses the `BCIV_TRACKER` repo secret — an
+anonymous "Anyone with the link can view" OneDrive share link). Whenever the
+spreadsheet is updated:
 
-| Name | Value |
-|---|---|
-| `GHIN_EMAIL` | The email (or GHIN number) you log into GHIN.com/the GHIN app with |
-| `GHIN_PASSWORD` | Your GHIN password |
+1. Go to the repo's **Actions** tab → **Sync player roster from OneDrive** → **Run workflow**.
+2. It commits the refreshed `data/BCIV_Draft.xlsx` back to the branch.
+3. Vercel redeploys automatically on that push (or reload the page if running locally —
+   the file is read fresh per request, not baked in at build time).
 
-Never commit these — `.env.local` is git-ignored; `.env.local.example` is the committed
-template.
-
-## 4. Fill in the real roster
-
-Before the draft, edit `data/players.json` with the real 16 names and GHIN numbers
-(GHIN numbers are optional per-player — if left `null`, the app tries to resolve the
-golfer by name, but that lookup path isn't confirmed to work yet; see caveats below).
-Commit and redeploy (or just edit directly if running locally).
-
-## 5. Deploy
+## 4. Deploy
 
 Trigger a deploy (push to the connected branch, or use the Vercel dashboard).
 
 ## Caveats — read before the draft
 
-- **This relies on an undocumented API.** `api2.ghin.com` is GHIN's own mobile-app API,
-  not a published/public API. GHIN can change it at any time without notice. If the app
-  suddenly stops returning data, the first troubleshooting step is running
-  `npm run discover-ghin -- --ghin <a-known-number> --name "Some Name"` locally (with
-  `.env.local` set) to see whether the response shapes changed, and updating
-  `src/lib/ghin.ts` / `src/lib/ghin-types.ts` accordingly.
-- **Golfer-search-by-name and score-history endpoints are best-guess.** If they don't
-  work, `getScoreHistory()` automatically falls back to
-  `data/score-history-overrides.json` — you can hand-paste recent differentials there
-  per GHIN number as a backup so trend calculation still works. Search-by-name has no
-  such fallback; if it doesn't resolve, add the golfer's GHIN number directly in
-  `data/players.json` instead.
-- **All requests use your one personal GHIN account.** The app caches the enriched
-  roster for 15–20 minutes and only refetches on a manual "Refresh data" click, to avoid
-  hammering GHIN with repeated logins/lookups if you reload the page a lot during the
-  live draft. Don't remove that caching, and avoid scripting rapid repeated requests —
-  it's plausible (though unconfirmed) that GHIN could rate-limit or flag an account
-  making unusual programmatic traffic.
-- **No auth in front of this app.** It's a personal tool that proxies your GHIN login;
-  anyone who finds the URL could trigger GHIN requests under your account (they can't
-  see your password, but they could cause traffic). Don't share or publicly link the
-  deployed URL. If that's a concern, put a simple shared secret or Vercel's built-in
-  password protection (Pro plans) in front of it — not built in by default since this is
-  meant to be used once, by you, during one draft evening.
+- **The OneDrive sync depends on an anonymous share link staying valid.** If someone
+  regenerates or revokes the share link, update the `BCIV_TRACKER` secret (repo
+  Settings → Secrets and variables → Actions) with the new one.
+- **`scripts/fetch_onedrive_file.py` uses Python's `requests` library, not curl** —
+  curl gets redirected to a Microsoft sign-in page even on a correctly-configured
+  anonymous link (bot-detection on the redirect chain); `requests`' automatic
+  cookie-handling across redirects gets through. Don't "simplify" this back to curl.
+- **Par is assumed for course-handicap math** (`data/courses.json`) — verify `par` for
+  each of the three event courses; Hilton Head National is confirmed Par 71, Palmetto
+  Dunes Robert Trent Jones / Arthur Hills are assumed Par 72.
+- **No auth in front of this app.** It's a personal tool; don't share or publicly link
+  the deployed URL if you'd rather keep the roster/handicaps private.

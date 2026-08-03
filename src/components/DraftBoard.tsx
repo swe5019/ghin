@@ -17,7 +17,7 @@ function loadDraftState(): DraftState {
   }
 }
 
-type SortMode = "handicap" | "trend" | "name";
+type SortMode = "draftRank" | "bestBall" | "trend" | "name";
 
 const TREND_ORDER: Record<string, number> = { hot: 0, steady: 1, cold: 2, insufficient_data: 3 };
 
@@ -45,7 +45,7 @@ export function DraftBoard({ initialRoster }: { initialRoster: RosterResponse })
   async function refresh() {
     setRefreshing(true);
     try {
-      const res = await fetch("/api/roster?force=true");
+      const res = await fetch("/api/roster");
       const body = (await res.json()) as RosterResponse;
       setLoadError(body.error ?? null);
       setRoster(body.players ?? []);
@@ -85,7 +85,7 @@ export function DraftBoard({ initialRoster }: { initialRoster: RosterResponse })
     setDraft(EMPTY_DRAFT);
   }
 
-  const [sortMode, setSortMode] = useState<SortMode>("handicap");
+  const [sortMode, setSortMode] = useState<SortMode>("bestBall");
   const [filterText, setFilterText] = useState("");
 
   const teamOf = (name: string): TeamId => assignments[name] ?? "pool";
@@ -100,10 +100,11 @@ export function DraftBoard({ initialRoster }: { initialRoster: RosterResponse })
 
     players = [...players].sort((a, b) => {
       if (sortMode === "name") return a.name.localeCompare(b.name);
-      if (sortMode === "handicap") {
-        if (a.handicapIndex === null) return 1;
-        if (b.handicapIndex === null) return -1;
-        return a.handicapIndex - b.handicapIndex;
+      if (sortMode === "draftRank") return a.draftRank - b.draftRank;
+      if (sortMode === "bestBall") {
+        if (a.bestBallRank === null) return 1;
+        if (b.bestBallRank === null) return -1;
+        return a.bestBallRank - b.bestBallRank;
       }
       const at = TREND_ORDER[a.trend?.status ?? "insufficient_data"];
       const bt = TREND_ORDER[b.trend?.status ?? "insufficient_data"];
@@ -173,7 +174,8 @@ export function DraftBoard({ initialRoster }: { initialRoster: RosterResponse })
               onChange={(e) => setSortMode(e.target.value as SortMode)}
               className="rounded border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
             >
-              <option value="handicap">Sort: Handicap</option>
+              <option value="bestBall">Sort: Best-Ball Value</option>
+              <option value="draftRank">Sort: Draft Rank</option>
               <option value="trend">Sort: Trend</option>
               <option value="name">Sort: Name</option>
             </select>

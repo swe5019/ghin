@@ -1,33 +1,41 @@
 # GHIN Draft Assistant
 
-A personal tool for drafting a golf trip team: pulls live GHIN Handicap Index data for
-your 16-player field and flags who's trending hot or cold relative to their handicap,
-so you can draft with more than just a static index number.
+A personal tool for drafting a golf trip team: reads a shared roster spreadsheet
+(names, handicaps, and logged rounds) and ranks golfers two ways - the spreadsheet's
+own Draft Rank, and a "Best-Ball Value" rank that also weighs consistency and the
+mid-handicap "sweet spot" for handicapped team formats.
+
+## How data gets in
+
+The roster lives in a OneDrive workbook (`BCIV_Draft.xlsx`, with `Round Log` and
+`Golfer Summary` sheets). `.github/workflows/sync-players.yml` fetches it via an
+anonymous share link (`BCIV_TRACKER` repo secret) using `scripts/fetch_onedrive_file.py`
+and commits it to `data/BCIV_Draft.xlsx`. Trigger it from the Actions tab after editing
+the workbook, and the app picks up the new file on the next page load (no rebuild
+needed - it's read fresh per-request, see `src/app/page.tsx`).
 
 ## Setup
 
 1. `npm install`
-2. `cp .env.local.example .env.local` and fill in your GHIN login (`GHIN_EMAIL`,
-   `GHIN_PASSWORD`).
-3. Edit `data/players.json` with the real 16 names (and GHIN numbers, if known).
-4. `npm run dev` and open http://localhost:3000.
+2. `npm run dev` and open http://localhost:3000.
 
-## Confirming GHIN's endpoints
+`data/BCIV_Draft.xlsx` is already committed; re-run the `Sync player roster from
+OneDrive` GitHub Action whenever the spreadsheet changes.
 
-GHIN has no public API. `src/lib/ghin.ts` talks to the same undocumented API GHIN's own
-mobile app uses. Login is confirmed; golfer-search-by-name and score-history are
-best-guess until verified. Run:
+## How ranking works
 
-```bash
-npm run discover-ghin -- --ghin <a-known-ghin-number> --name "Some Golfer Name"
-```
+- `src/lib/workbook.ts` parses `Round Log` (per-round differentials) and `Golfer
+  Summary` (the spreadsheet's own handicap-weighted Draft Rank) out of the xlsx.
+- `src/lib/trend.ts` compares a golfer's recent differentials to their Handicap Index
+  to flag Hot/Cold/Steady (needs 3+ rounds logged).
+- `src/lib/courses.ts` computes each golfer's Course Handicap for the event's three
+  rounds (`data/courses.json`: rating/slope/par per course, 90% stroke allowance) -
+  used instead of a generic Handicap Index since these courses' slopes (124-137) are
+  all at or above the 113 average, so real strokes-in-play differ from the raw index.
+- `src/lib/bestball.ts` combines recent form, round-to-round consistency, and distance
+  from the sweet-spot handicap (~13.5, using the course-adjusted handicap) into a
+  separate "Best-Ball Value" rank - weights are named constants, tune as needed.
 
-with `.env.local` filled in, and update `src/lib/ghin-types.ts` / `src/lib/ghin.ts` to
-match whatever real shapes come back. See `scripts/discover-ghin.ts` for details, and
-`docs/DEPLOY.md` for deployment steps and caveats.
+## Deployment
 
-## How trend is calculated
-
-`src/lib/trend.ts` compares the average of a golfer's last ~8 score differentials to
-their current Handicap Index. More than 1.0 stroke better on average = "Hot", more than
-1.0 worse = "Cold", otherwise "Steady". Fewer than 3 recent scores = "insufficient data".
+See `docs/DEPLOY.md`.

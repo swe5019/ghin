@@ -2,11 +2,7 @@ import { PlayerCard } from "./PlayerCard";
 import type { RosterPlayer } from "@/types/draft";
 
 export function TeamColumn({ title, players }: { title: string; players: RosterPlayer[] }) {
-  const withHandicap = players.filter((p) => p.handicapIndex !== null);
-  const avg =
-    withHandicap.length > 0
-      ? withHandicap.reduce((sum, p) => sum + (p.handicapIndex as number), 0) / withHandicap.length
-      : null;
+  const avg = players.length > 0 ? players.reduce((sum, p) => sum + p.handicapIndex, 0) / players.length : null;
 
   return (
     <div className="flex-1">
