@@ -1,0 +1,8 @@
+{
+  "_comment": "14 picks (16 players minus the 2 captains). Not a pure snake — it alternates from pick 1, Captain B takes back-to-back picks at 6 and 7, then it alternates again with B leading. Each captain ends with 7 picks.",
+  "captains": {
+    "A": "Captain A",
+    "B": "Captain B"
+  },
+  "pickOrder": ["A", "B", "A", "B", "A", "B", "B", "A", "B", "A", "B", "A", "B", "A"]
+}

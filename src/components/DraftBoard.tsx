@@ -1,23 +1,35 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { PlayerCard } from "./PlayerCard";
-import { TeamColumn } from "./TeamColumn";
+import { DraftStatusBar } from "./DraftStatusBar";
+import { PlayerRow } from "./PlayerRow";
+import { TeamPanel } from "./TeamPanel";
+import type { CaptainId } from "@/lib/draft";
 import type { DraftState, RosterPlayer, RosterResponse, TeamId } from "@/types/draft";
 
-const STORAGE_KEY = "ghin-draft-state-v1";
-const EMPTY_DRAFT: DraftState = { assignments: {}, pickHistory: [] };
+const STORAGE_KEY = "ghin-draft-state-v2";
+const EMPTY_DRAFT: DraftState = { assignments: {}, pickHistory: [], myCaptain: "A" };
 
 function loadDraftState(): DraftState {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as DraftState) : EMPTY_DRAFT;
+    if (!raw) return EMPTY_DRAFT;
+    return { ...EMPTY_DRAFT, ...(JSON.parse(raw) as DraftState) };
   } catch {
     return EMPTY_DRAFT;
   }
 }
 
-type SortMode = "overall" | "bestBall" | "singles" | "draftRank" | "trend" | "name";
+type SortMode = "overall" | "bestBall" | "singles" | "trend" | "index" | "name";
+
+const SORT_LABELS: Record<SortMode, string> = {
+  overall: "Overall",
+  bestBall: "Best ball",
+  singles: "Singles",
+  trend: "Trend",
+  index: "Handicap",
+  name: "Name",
+};
 
 const TREND_ORDER: Record<string, number> = { hot: 0, steady: 1, cold: 2, insufficient_data: 3 };
 
@@ -25,10 +37,15 @@ export function DraftBoard({ initialRoster }: { initialRoster: RosterResponse })
   const [roster, setRoster] = useState<RosterPlayer[]>(initialRoster.players);
   const [fetchedAt, setFetchedAt] = useState<string | null>(initialRoster.fetchedAt);
   const [fieldGap, setFieldGap] = useState<number | undefined>(initialRoster.fieldGap);
+  const [draftConfig, setDraftConfig] = useState(initialRoster.draft);
   const [loadError, setLoadError] = useState<string | null>(initialRoster.error ?? null);
   const [refreshing, setRefreshing] = useState(false);
-  // Draft picks are undefined until mount (SSR has no localStorage); this component only
-  // renders picks once hydrated, so there's no server/client markup mismatch.
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [sortMode, setSortMode] = useState<SortMode>("overall");
+  const [filterText, setFilterText] = useState("");
+
+  // Draft picks are undefined until mount (SSR has no localStorage); picks only render
+  // once hydrated, so there's no server/client markup mismatch.
   const [draft, setDraft] = useState<DraftState | null>(null);
 
   useEffect(() => {
@@ -38,9 +55,7 @@ export function DraftBoard({ initialRoster }: { initialRoster: RosterResponse })
   }, []);
 
   useEffect(() => {
-    if (draft) {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
-    }
+    if (draft) window.localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
   }, [draft]);
 
   async function refresh() {
@@ -53,8 +68,9 @@ export function DraftBoard({ initialRoster }: { initialRoster: RosterResponse })
       setRoster(body.players ?? []);
       setFetchedAt(body.fetchedAt ?? null);
       setFieldGap(body.fieldGap);
+      setDraftConfig(body.draft);
     } catch (err) {
-      setLoadError(`Failed to reach the server: ${(err as Error).message}`);
+      setLoadError(`Couldn't reload the roster: ${(err as Error).message}`);
     } finally {
       setRefreshing(false);
     }
@@ -62,12 +78,17 @@ export function DraftBoard({ initialRoster }: { initialRoster: RosterResponse })
 
   const assignments = draft?.assignments ?? {};
   const pickHistory = draft?.pickHistory ?? [];
+  const myCaptain: CaptainId = draft?.myCaptain ?? "A";
+  const pickOrder = draftConfig?.pickOrder ?? [];
+  const captains = draftConfig?.captains ?? { A: "Captain A", B: "Captain B" };
+  const onTheClock: CaptainId | null = pickHistory.length < pickOrder.length ? pickOrder[pickHistory.length] : null;
 
-  function assign(name: string, team: TeamId) {
+  function draftPlayer(name: string, captain: CaptainId) {
     setDraft((prev) => {
       const base = prev ?? EMPTY_DRAFT;
       return {
-        assignments: { ...base.assignments, [name]: team },
+        ...base,
+        assignments: { ...base.assignments, [name]: captain },
         pickHistory: [...base.pickHistory, name],
       };
     });
@@ -80,16 +101,13 @@ export function DraftBoard({ initialRoster }: { initialRoster: RosterResponse })
       const last = history.pop() as string;
       const nextAssignments = { ...prev.assignments };
       delete nextAssignments[last];
-      return { assignments: nextAssignments, pickHistory: history };
+      return { ...prev, assignments: nextAssignments, pickHistory: history };
     });
   }
 
   function resetDraft() {
-    setDraft(EMPTY_DRAFT);
+    setDraft((prev) => ({ ...EMPTY_DRAFT, myCaptain: prev?.myCaptain ?? "A" }));
   }
-
-  const [sortMode, setSortMode] = useState<SortMode>("overall");
-  const [filterText, setFilterText] = useState("");
 
   const teamOf = (name: string): TeamId => assignments[name] ?? "pool";
 
@@ -101,99 +119,148 @@ export function DraftBoard({ initialRoster }: { initialRoster: RosterResponse })
       players = players.filter((p) => p.name.toLowerCase().includes(q));
     }
 
-    players = [...players].sort((a, b) => {
-      if (sortMode === "name") return a.name.localeCompare(b.name);
-      if (sortMode === "overall") return a.overallRank - b.overallRank;
-      if (sortMode === "bestBall") return a.bestBallRank - b.bestBallRank;
-      if (sortMode === "singles") return a.singlesRank - b.singlesRank;
-      if (sortMode === "draftRank") return a.draftRank - b.draftRank;
-      const at = TREND_ORDER[a.trend?.status ?? "insufficient_data"];
-      const bt = TREND_ORDER[b.trend?.status ?? "insufficient_data"];
-      return at - bt;
+    return [...players].sort((a, b) => {
+      switch (sortMode) {
+        case "name":
+          return a.name.localeCompare(b.name);
+        case "index":
+          return a.handicapIndex - b.handicapIndex;
+        case "bestBall":
+          return a.bestBallRank - b.bestBallRank;
+        case "singles":
+          return a.singlesRank - b.singlesRank;
+        case "trend": {
+          const at = TREND_ORDER[a.trend?.status ?? "insufficient_data"];
+          const bt = TREND_ORDER[b.trend?.status ?? "insufficient_data"];
+          return at !== bt ? at - bt : a.overallRank - b.overallRank;
+        }
+        default:
+          return a.overallRank - b.overallRank;
+      }
     });
-
-    return players;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roster, assignments, filterText, sortMode]);
 
-  const myTeam = roster.filter((p) => teamOf(p.name) === "myTeam");
-  const opponentTeam = roster.filter((p) => teamOf(p.name) === "opponentTeam");
+  const teamFor = (captain: CaptainId) =>
+    pickHistory.filter((name) => assignments[name] === captain).map((name) => roster.find((p) => p.name === name)!).filter(Boolean);
+
+  const picksLeftFor = (captain: CaptainId) =>
+    pickOrder.slice(pickHistory.length).filter((c) => c === captain).length;
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-4 p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-200 pb-3 dark:border-zinc-800">
+    <div className="mx-auto flex max-w-7xl flex-col gap-4 p-4">
+      <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">GHIN Draft Assistant</h1>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">
-            Ranked by expected score after strokes. Best Ball weights upside, Singles weights
-            consistency.
-            {fieldGap !== undefined && ` Trend is vs. the field's typical ${fieldGap.toFixed(1)} over index.`}
-            {fetchedAt && ` · Data as of ${new Date(fetchedAt).toLocaleTimeString()}`}
+          <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">BCIV Draft Board</h1>
+          <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+            Ranked by expected score after strokes — best ball weights upside, singles weights consistency.
+            {fieldGap !== undefined && ` Trend compares to the field's typical ${fieldGap.toFixed(1)} over index.`}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={undo}
             disabled={pickHistory.length === 0}
-            className="rounded border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+            className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
           >
-            Undo last pick
+            Undo
           </button>
           <button
             onClick={resetDraft}
-            className="rounded border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+            className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
           >
-            Reset draft
+            Reset
           </button>
           <button
             onClick={refresh}
             disabled={refreshing}
-            className="rounded bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900"
+            className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
           >
-            {refreshing ? "Refreshing…" : "Refresh data"}
+            {refreshing ? "Refreshing…" : "Refresh"}
           </button>
         </div>
-      </div>
+      </header>
 
       {loadError && (
-        <div className="rounded border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300">
+        <div className="rounded-md border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300">
           {loadError}
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+      {draft && pickOrder.length > 0 && (
+        <DraftStatusBar
+          pickOrder={pickOrder}
+          captains={captains}
+          pickIndex={pickHistory.length}
+          myCaptain={myCaptain}
+          onChangeCaptain={(c) => setDraft((prev) => ({ ...(prev ?? EMPTY_DRAFT), myCaptain: c }))}
+        />
+      )}
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <div>
           <div className="mb-2 flex flex-wrap items-center gap-2">
-            <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">Player Pool</h2>
+            <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">
+              Available <span className="text-sm font-normal text-zinc-500 dark:text-zinc-400">({pool.length})</span>
+            </h2>
             <input
               value={filterText}
               onChange={(e) => setFilterText(e.target.value)}
-              placeholder="Filter by name…"
-              className="ml-auto rounded border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+              placeholder="Search…"
+              className="ml-auto w-32 rounded-md border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
             />
             <select
               value={sortMode}
               onChange={(e) => setSortMode(e.target.value as SortMode)}
-              className="rounded border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+              className="rounded-md border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
             >
-              <option value="overall">Sort: Overall</option>
-              <option value="bestBall">Sort: Best Ball</option>
-              <option value="singles">Sort: Singles</option>
-              <option value="draftRank">Sort: Spreadsheet Rank</option>
-              <option value="trend">Sort: Trend</option>
-              <option value="name">Sort: Name</option>
+              {(Object.keys(SORT_LABELS) as SortMode[]).map((m) => (
+                <option key={m} value={m}>
+                  Sort: {SORT_LABELS[m]}
+                </option>
+              ))}
             </select>
           </div>
+
           <div className="flex flex-col gap-2">
-            {pool.length === 0 && <p className="text-sm text-zinc-400">No undrafted players match.</p>}
+            {pool.length === 0 && (
+              <p className="rounded-lg border border-dashed border-zinc-300 py-8 text-center text-sm text-zinc-400 dark:border-zinc-700 dark:text-zinc-600">
+                {roster.length === 0 ? "No roster data loaded." : "Everyone's been drafted."}
+              </p>
+            )}
             {pool.map((p) => (
-              <PlayerCard key={p.name} player={p} onAssign={(team) => assign(p.name, team)} />
+              <PlayerRow
+                key={p.name}
+                player={p}
+                expanded={expanded === p.name}
+                onToggle={() => setExpanded(expanded === p.name ? null : p.name)}
+                onDraft={(captain) => draftPlayer(p.name, captain)}
+                captains={captains}
+                onTheClock={onTheClock}
+              />
             ))}
           </div>
         </div>
 
-        <TeamColumn title="My Team" players={myTeam} />
-        <TeamColumn title="Opponent Team" players={opponentTeam} />
+        <div className="flex flex-col gap-4">
+          <TeamPanel
+            title={captains.A}
+            players={teamFor("A")}
+            isMine={myCaptain === "A"}
+            picksRemaining={picksLeftFor("A")}
+          />
+          <TeamPanel
+            title={captains.B}
+            players={teamFor("B")}
+            isMine={myCaptain === "B"}
+            picksRemaining={picksLeftFor("B")}
+          />
+          {fetchedAt && (
+            <p className="text-center text-xs text-zinc-400 dark:text-zinc-600">
+              Data as of {new Date(fetchedAt).toLocaleString()}
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -1,4 +1,17 @@
+import type { CaptainId } from "@/lib/draft";
 import type { TrendResult } from "@/lib/trend";
+
+/** One logged round, as shown in a golfer's expanded detail view. */
+export interface PlayerRound {
+  /** ISO date string, or null when the sheet had no date. */
+  date: string | null;
+  courseName: string | null;
+  tees: string | null;
+  courseRating: number | null;
+  slopeRating: number | null;
+  grossScore: number | null;
+  differential: number;
+}
 
 export interface RosterPlayer {
   name: string;
@@ -19,6 +32,8 @@ export interface RosterPlayer {
   /** Average Course Handicap across the event's 3 rounds, given the actual course slopes. */
   eventCourseHandicap: number;
   trend: TrendResult | null;
+  /** This golfer's logged rounds, oldest first. */
+  rounds: PlayerRound[];
   /** True when this golfer has no logged rounds, so their numbers fall back to the field average. */
   insufficientData: boolean;
   /** Set when this player's data couldn't be resolved from the workbook; player is still draftable. */
@@ -28,17 +43,21 @@ export interface RosterPlayer {
 export interface RosterResponse {
   players: RosterPlayer[];
   fetchedAt: string;
-  /** The field's average gap-to-index — the baseline trend is measured against. */
+  /** The field's median gap-to-index — the baseline trend is measured against. */
   fieldGap?: number;
+  /** Draft pick order and captain names. */
+  draft?: { captains: Record<CaptainId, string>; pickOrder: CaptainId[] };
   /** Set when the whole roster load failed (e.g. workbook missing/unreadable). */
   error?: string;
 }
 
-export type TeamId = "pool" | "myTeam" | "opponentTeam";
+export type TeamId = "pool" | "A" | "B";
 
 export interface DraftState {
-  /** Maps a player name to which team/pool they're currently in. */
+  /** Maps a player name to which captain drafted them (or "pool" if undrafted). */
   assignments: Record<string, TeamId>;
-  /** Stack of player names in pick order, for "Undo last pick". */
+  /** Player names in pick order, for undo and for knowing which pick we're on. */
   pickHistory: string[];
+  /** Which captain the user is, so the board can highlight their turn. */
+  myCaptain: CaptainId;
 }

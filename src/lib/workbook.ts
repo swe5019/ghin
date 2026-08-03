@@ -7,6 +7,11 @@ export interface RoundEntry {
   golferName: string;
   differential: number;
   date: Date | null;
+  courseName: string | null;
+  tees: string | null;
+  courseRating: number | null;
+  slopeRating: number | null;
+  grossScore: number | null;
 }
 
 export interface GolferSummaryRow {
@@ -68,7 +73,16 @@ export async function loadWorkbookData(): Promise<WorkbookData> {
     const dateValue = row.getCell(2).value;
     const date = dateValue instanceof Date ? dateValue : null;
     if (golferName && differential !== null) {
-      rounds.push({ golferName, differential, date });
+      rounds.push({
+        golferName,
+        differential,
+        date,
+        courseName: cellString(row.getCell(3).value),
+        tees: cellString(row.getCell(4).value),
+        courseRating: cellNumber(row.getCell(5).value),
+        slopeRating: cellNumber(row.getCell(6).value),
+        grossScore: cellNumber(row.getCell(7).value),
+      });
     }
   });
 

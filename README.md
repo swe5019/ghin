@@ -47,6 +47,17 @@ OneDrive` GitHub Action whenever the spreadsheet changes.
   typical gap (not to their index — that would label nearly everyone "cold"). Needs 3+
   rounds logged.
 
+## Using the board
+
+The draft order lives in `data/draft.json` — 14 picks, alternating except that Captain B
+takes back-to-back picks at 6 and 7, so each captain ends with 7. The status bar tracks
+whose turn it is and how many golfers come off the board before your next pick. Pick
+"I am" to set which captain you are; that and the draft itself persist in `localStorage`,
+so a refresh mid-draft won't lose anything.
+
+Click any golfer to see their logged rounds — score, course rating/slope, and the
+resulting differential, with differentials better than their index highlighted.
+
 ## Deployment
 
 See `docs/DEPLOY.md`.

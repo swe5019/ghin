@@ -2,6 +2,10 @@ export type TrendStatus = "hot" | "cold" | "steady" | "insufficient_data";
 
 export interface TrendResult {
   status: TrendStatus;
+  /** How many rounds back this trend. Below MIN_ROUNDS_FOR_CONFIDENCE it's provisional. */
+  roundsUsed: number;
+  /** True when based on only 1-2 rounds — directionally useful, but noisy. */
+  lowConfidence: boolean;
   /** How this golfer's gap-to-index compares to the field's. Negative = playing better than the field norm. */
   delta?: number;
   avgRecent?: number;
@@ -14,7 +18,10 @@ export interface TrendResult {
 }
 
 const MAX_RECENT_ROUNDS = 8;
-const MIN_ROUNDS_REQUIRED = 3;
+/** One round is enough to say something; it's just noisy, so it's flagged low-confidence. */
+const MIN_ROUNDS_REQUIRED = 1;
+/** At or above this many rounds, the trend is reported without a caveat. */
+export const MIN_ROUNDS_FOR_CONFIDENCE = 3;
 
 /** Tunable heuristic — how far from the field norm counts as hot/cold. */
 export const TREND_THRESHOLD = 1.0;
@@ -38,7 +45,12 @@ export function computeTrend(handicapIndex: number, differentials: number[], fie
   const recent = differentials.slice(-MAX_RECENT_ROUNDS);
 
   if (recent.length < MIN_ROUNDS_REQUIRED) {
-    return { status: "insufficient_data", sparklineData: recent };
+    return {
+      status: "insufficient_data",
+      roundsUsed: 0,
+      lowConfidence: true,
+      sparklineData: recent,
+    };
   }
 
   const avgRecent = mean(recent);
@@ -54,5 +66,14 @@ export function computeTrend(handicapIndex: number, differentials: number[], fie
     status = "steady";
   }
 
-  return { status, delta, avgRecent, gap, fieldGap, sparklineData: recent };
+  return {
+    status,
+    roundsUsed: recent.length,
+    lowConfidence: recent.length < MIN_ROUNDS_FOR_CONFIDENCE,
+    delta,
+    avgRecent,
+    gap,
+    fieldGap,
+    sparklineData: recent,
+  };
 }
