@@ -14,11 +14,11 @@ jobs:
 
       - name: Download the file from OneDrive/SharePoint
         env:
-          SOURCE_URL: ${{ secrets.BIV_TRACKER }}
+          SOURCE_URL: ${{ secrets.BCIV_TRACKER }}
         run: |
           set -uo pipefail
           if [ -z "${SOURCE_URL:-}" ]; then
-            echo "::error::BIV_TRACKER secret is not set"
+            echo "::error::BCIV_TRACKER secret is not set"
             exit 1
           fi
           mkdir -p data
