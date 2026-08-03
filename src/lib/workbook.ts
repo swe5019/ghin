@@ -5,13 +5,41 @@ const WORKBOOK_PATH = path.join(process.cwd(), "data", "BCIV_Draft.xlsx");
 
 export interface RoundEntry {
   golferName: string;
+  /**
+   * Always on the 18-hole scale, so differentials are comparable to a Handicap Index.
+   * A 9-hole round's differential is doubled to get here — see normalizeDifferential.
+   */
   differential: number;
+  /** The differential exactly as the sheet computed it, before any 9-hole scaling. */
+  rawDifferential: number;
+  holes: 9 | 18;
   date: Date | null;
   courseName: string | null;
   tees: string | null;
   courseRating: number | null;
   slopeRating: number | null;
   grossScore: number | null;
+}
+
+/**
+ * Highest a 9-hole Course Rating realistically goes. 18-hole ratings start around 60,
+ * so there's a wide gap and no ambiguity — this is what lets us infer hole count from
+ * the rating when the sheet has no explicit Holes column.
+ */
+const MAX_NINE_HOLE_RATING = 50;
+
+/**
+ * A 9-hole round yields a 9-hole differential, which is roughly half the scale of an
+ * 18-hole one. Doubling puts it on the 18-hole scale so it can sit alongside the rest
+ * and be compared to a Handicap Index.
+ *
+ * Note this is an approximation: doubling one 9-hole differential carries more
+ * round-to-round noise than a real 18-hole differential, so a golfer logged mostly with
+ * single 9s will look more volatile than they are. Combining two 9s into one 18-hole
+ * entry avoids that and is closer to how WHS actually handles it.
+ */
+export function normalizeDifferential(differential: number, holes: 9 | 18): number {
+  return holes === 9 ? differential * 2 : differential;
 }
 
 export interface GolferSummaryRow {
@@ -63,23 +91,42 @@ export async function loadWorkbookData(): Promise<WorkbookData> {
     throw new Error('Workbook is missing the expected "Round Log" or "Golfer Summary" sheet.');
   }
 
+  // Optional "Holes" column — find it by header text so it works wherever it's added.
+  const ROUND_LOG_HEADER_ROW = 4;
+  let holesColumn: number | null = null;
+  roundLog.getRow(ROUND_LOG_HEADER_ROW).eachCell((cell, colNumber) => {
+    if (/^\s*holes\s*$/i.test(String(cellString(cell.value) ?? ""))) holesColumn = colNumber;
+  });
+
   const rounds: RoundEntry[] = [];
   // Header row is row 4: Golfer Name | Date | Course Name | Tees Played | Course Rating | Slope Rating | Score (Gross) | Handicap Differential
   // Row 5 is a template/example row the workbook's own formulas exclude (they range over $A$6:$A$65), so start at 6.
   roundLog.eachRow({ includeEmpty: false }, (row, rowNumber) => {
     if (rowNumber <= 5) return;
     const golferName = cellString(row.getCell(1).value);
-    const differential = cellNumber(row.getCell(8).value);
+    const rawDifferential = cellNumber(row.getCell(8).value);
     const dateValue = row.getCell(2).value;
     const date = dateValue instanceof Date ? dateValue : null;
-    if (golferName && differential !== null) {
+    const courseRating = cellNumber(row.getCell(5).value);
+
+    // Prefer an explicit Holes column; otherwise infer from the Course Rating, since
+    // 9-hole ratings (~33-37) and 18-hole ratings (60+) don't overlap.
+    const declaredHoles = holesColumn ? cellNumber(row.getCell(holesColumn).value) : null;
+    const holes: 9 | 18 =
+      declaredHoles === 9 || (declaredHoles === null && courseRating !== null && courseRating < MAX_NINE_HOLE_RATING)
+        ? 9
+        : 18;
+
+    if (golferName && rawDifferential !== null) {
       rounds.push({
         golferName,
-        differential,
+        rawDifferential,
+        differential: normalizeDifferential(rawDifferential, holes),
+        holes,
         date,
         courseName: cellString(row.getCell(3).value),
         tees: cellString(row.getCell(4).value),
-        courseRating: cellNumber(row.getCell(5).value),
+        courseRating,
         slopeRating: cellNumber(row.getCell(6).value),
         grossScore: cellNumber(row.getCell(7).value),
       });

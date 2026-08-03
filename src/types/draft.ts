@@ -10,7 +10,11 @@ export interface PlayerRound {
   courseRating: number | null;
   slopeRating: number | null;
   grossScore: number | null;
+  /** On the 18-hole scale — a 9-hole round's differential is doubled to get here. */
   differential: number;
+  /** As the sheet computed it, before 9-hole scaling. */
+  rawDifferential: number;
+  holes: 9 | 18;
 }
 
 export interface RosterPlayer {

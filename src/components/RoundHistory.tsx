@@ -13,6 +13,7 @@ function formatRoundDate(iso: string | null): string {
 
 function DiffCell({ round, index }: { round: PlayerRound; index: number }) {
   const better = round.differential < index;
+  const nine = round.holes === 9;
   return (
     <span
       className={
@@ -20,9 +21,17 @@ function DiffCell({ round, index }: { round: PlayerRound; index: number }) {
           ? "font-medium text-emerald-700 dark:text-emerald-400"
           : "font-medium text-zinc-600 dark:text-zinc-400"
       }
-      title={better ? "Better than their Handicap Index" : "Worse than their Handicap Index"}
+      title={
+        nine
+          ? `9-hole differential ${round.rawDifferential.toFixed(1)}, doubled to ${round.differential.toFixed(1)} ` +
+            `so it's comparable to 18-hole rounds. ${better ? "Better" : "Worse"} than their index.`
+          : better
+            ? "Better than their Handicap Index"
+            : "Worse than their Handicap Index"
+      }
     >
       {round.differential.toFixed(1)}
+      {nine && <span className="ml-0.5 text-[10px] font-normal opacity-60">×2</span>}
     </span>
   );
 }
@@ -60,6 +69,11 @@ export function RoundHistory({ player }: { player: RosterPlayer }) {
               <td className="px-3 py-2 text-zinc-600 dark:text-zinc-400">
                 {round.courseName ?? "—"}
                 {round.tees ? ` (${round.tees})` : ""}
+                {round.holes === 9 && (
+                  <span className="ml-1.5 rounded bg-zinc-200 px-1 py-0.5 text-[10px] font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                    9 holes
+                  </span>
+                )}
               </td>
               <td className="px-3 py-2 text-right tabular-nums text-zinc-900 dark:text-zinc-100">
                 {round.grossScore ?? "—"}

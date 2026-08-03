@@ -48,6 +48,8 @@ export async function getRoster(): Promise<RosterResponse> {
         slopeRating: round.slopeRating,
         grossScore: round.grossScore,
         differential: round.differential,
+        rawDifferential: round.rawDifferential,
+        holes: round.holes,
       }));
 
       return {

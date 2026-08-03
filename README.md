@@ -22,6 +22,23 @@ needed - it's read fresh per-request, see `src/app/page.tsx`).
 `data/BCIV_Draft.xlsx` is already committed; re-run the `Sync player roster from
 OneDrive` GitHub Action whenever the spreadsheet changes.
 
+### Logging 9-hole rounds
+
+Enter the **9-hole** Course Rating and Slope for the nine actually played (they run
+~33-37 and ~100-140), and the 9-hole gross score. The sheet's existing formula then
+produces a 9-hole differential, and the app doubles it onto the 18-hole scale so it's
+comparable to everything else — shown in the detail view with a `9 holes` tag and a
+`×2` marker.
+
+Hole count is detected from the Course Rating, since 9-hole and 18-hole ratings don't
+overlap. To be explicit instead, add a column headed `Holes` to the Round Log (anywhere
+in the row) with `9` or `18`; that takes precedence over the inference.
+
+Caveat: doubling one 9-hole differential carries more round-to-round noise than a real
+18-hole round, so a golfer logged mostly with single nines will look more volatile than
+they are. If you have two nines from the same day, combining them into a single 18-hole
+entry is more accurate and closer to how WHS handles it.
+
 ## How ranking works
 
 - `src/lib/workbook.ts` parses `Round Log` (per-round differentials) and `Golfer
