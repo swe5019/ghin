@@ -4,13 +4,15 @@
  * "Refresh data" button has a static file to re-fetch on GitHub Pages (no server route
  * available there). Runs as a prebuild step - see package.json.
  */
-import { writeFile } from "fs/promises";
+import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import { getRoster } from "../src/lib/roster";
 
 async function main() {
   const roster = await getRoster();
-  const outPath = path.join(process.cwd(), "public", "roster.json");
+  const outDir = path.join(process.cwd(), "public");
+  const outPath = path.join(outDir, "roster.json");
+  await mkdir(outDir, { recursive: true });
   await writeFile(outPath, JSON.stringify(roster, null, 2));
   console.log(`Wrote ${outPath} (${roster.players.length} players)`);
 }
