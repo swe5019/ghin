@@ -1,0 +1,44 @@
+name: Sync player roster from OneDrive
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve anonymous OneDrive share link and download the file
+        env:
+          SOURCE_URL: ${{ secrets.BIV_TRACKER }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SOURCE_URL:-}" ]; then
+            echo "::error::BIV_TRACKER secret is not set"
+            exit 1
+          fi
+          # Anonymous OneDrive share links are resolved via the documented
+          # "shares" API by base64-encoding the share URL into a token:
+          # https://learn.microsoft.com/onedrive/developer/rest-api/api/shares_get
+          ENCODED=$(printf '%s' "$SOURCE_URL" | base64 | tr '/+' '_-' | tr -d '=')
+          TOKEN="u!$ENCODED"
+          mkdir -p data
+          curl -L -f --retry 3 -o data/BCIV_Draft.xlsx \
+            "https://api.onedrive.com/v1.0/shares/${TOKEN}/root/content"
+          file data/BCIV_Draft.xlsx
+
+      - name: Commit updated file
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/BCIV_Draft.xlsx
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Sync BCIV_Draft.xlsx from OneDrive"
+            git push
+          fi
