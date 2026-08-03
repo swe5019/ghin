@@ -1,10 +1,8 @@
 import { DraftBoard } from "@/components/DraftBoard";
 import { getRoster } from "@/lib/roster";
 
-// data/BCIV_Draft.xlsx is refreshed by the sync-players.yml workflow after a build,
-// so this must re-read it per-request rather than being baked in at build time.
-export const dynamic = "force-dynamic";
-
+// Static export (GitHub Pages) - data/BCIV_Draft.xlsx is read once at build time here.
+// The deploy workflow rebuilds whenever the roster syncs, so this stays current.
 export default async function Home() {
   const initialRoster = await getRoster();
 

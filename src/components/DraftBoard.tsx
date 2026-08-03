@@ -45,7 +45,8 @@ export function DraftBoard({ initialRoster }: { initialRoster: RosterResponse })
   async function refresh() {
     setRefreshing(true);
     try {
-      const res = await fetch("/api/roster");
+      const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+      const res = await fetch(`${basePath}/roster.json?t=${Date.now()}`);
       const body = (await res.json()) as RosterResponse;
       setLoadError(body.error ?? null);
       setRoster(body.players ?? []);

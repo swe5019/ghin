@@ -1,34 +1,39 @@
 # Deploying the GHIN Draft Assistant
 
-This is a personal, single-user tool — no auth system, no database. It reads a
-committed spreadsheet file (`data/BCIV_Draft.xlsx`), so deploying it just means
-putting the Next.js app somewhere reachable from a browser.
+This is a personal, single-user tool — no auth system, no database. It's a static
+export (`output: "export"` in `next.config.ts`), deployed to **GitHub Pages** by
+`.github/workflows/deploy-pages.yml`.
 
-## 1. Push the repo to GitHub (if not already)
+## One-time setup
 
-Vercel deploys from a Git repo.
+In the repo's **Settings → Pages**, set **Source** to **GitHub Actions**. That's the
+only manual step — everything else is automated.
 
-## 2. Import into Vercel
+## How it deploys
 
-1. Go to https://vercel.com/new and import this repository.
-2. Framework preset: Next.js (auto-detected).
-3. No environment variables are required for the app itself.
+`deploy-pages.yml` runs on:
+- every push to `claude/session-9qmpfr`,
+- automatically after **Sync player roster from OneDrive** finishes (chained via
+  `workflow_run`, since a push made with the default `GITHUB_TOKEN` doesn't trigger
+  other workflows itself),
+- or manually via **Actions → Deploy to GitHub Pages → Run workflow**.
 
-## 3. Keeping the roster current
+It builds with `GITHUB_PAGES=true` (sets the `/ghin` base path for GitHub Pages'
+subpath hosting), then publishes `out/` via `actions/deploy-pages`.
 
-The roster comes from `data/BCIV_Draft.xlsx`, synced from OneDrive by
-`.github/workflows/sync-players.yml` (uses the `BCIV_TRACKER` repo secret — an
-anonymous "Anyone with the link can view" OneDrive share link). Whenever the
-spreadsheet is updated:
+## Keeping the roster current
 
-1. Go to the repo's **Actions** tab → **Sync player roster from OneDrive** → **Run workflow**.
-2. It commits the refreshed `data/BCIV_Draft.xlsx` back to the branch.
-3. Vercel redeploys automatically on that push (or reload the page if running locally —
-   the file is read fresh per request, not baked in at build time).
+1. Update the spreadsheet in OneDrive.
+2. Go to **Actions → Sync player roster from OneDrive → Run workflow**. It fetches the
+   file (via the `BCIV_TRACKER` anonymous share-link secret) and commits
+   `data/BCIV_Draft.xlsx`.
+3. That success automatically triggers **Deploy to GitHub Pages**, which rebuilds
+   (baking the new roster data into the static site) and redeploys.
 
-## 4. Deploy
-
-Trigger a deploy (push to the connected branch, or use the Vercel dashboard).
+The "Refresh data" button on the page re-fetches `roster.json` from the *currently
+deployed* build — useful if a deploy happened in the background while the tab was
+open, but it doesn't pull live spreadsheet data (the site is fully static; getting new
+data always means re-running the sync + redeploy above).
 
 ## Caveats — read before the draft
 
@@ -43,4 +48,5 @@ Trigger a deploy (push to the connected branch, or use the Vercel dashboard).
   each of the three event courses; Hilton Head National is confirmed Par 71, Palmetto
   Dunes Robert Trent Jones / Arthur Hills are assumed Par 72.
 - **No auth in front of this app.** It's a personal tool; don't share or publicly link
-  the deployed URL if you'd rather keep the roster/handicaps private.
+  the deployed URL if you'd rather keep the roster/handicaps private (GitHub Pages
+  sites are public by default on free/personal plans).
