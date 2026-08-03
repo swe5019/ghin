@@ -1,3 +1,4 @@
+import { formatCourseHandicap, formatHandicapIndex } from "@/lib/format";
 import type { PlayerRound, RosterPlayer } from "@/types/draft";
 
 /**
@@ -76,9 +77,11 @@ export function RoundHistory({ player }: { player: RosterPlayer }) {
         </tbody>
       </table>
       <p className="px-3 py-2 text-xs text-zinc-500 dark:text-zinc-400">
-        Handicap Index {player.handicapIndex.toFixed(1)} · plays to about{" "}
-        {player.eventCourseHandicap.toFixed(0)} on these courses. Differential adjusts each score
-        for course difficulty, so it&apos;s comparable across courses.
+        {/* Explicit {" "} around expressions — the JSX transform trims the literal spaces here. */}
+        Handicap Index {formatHandicapIndex(player.handicapIndex)} · plays to about{" "}
+        {formatCourseHandicap(player.eventCourseHandicap)}{" "}
+        on these courses. Differential adjusts each score for course difficulty, so it&apos;s
+        comparable across courses.
       </p>
     </div>
   );

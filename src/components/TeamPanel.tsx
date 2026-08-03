@@ -1,4 +1,5 @@
 import { TrendBadge } from "./TrendBadge";
+import { formatHandicapIndex } from "@/lib/format";
 import type { RosterPlayer } from "@/types/draft";
 
 export function TeamPanel({
@@ -40,7 +41,10 @@ export function TeamPanel({
       {avgIndex !== null && avgNet !== null && (
         <div className="mb-3 flex gap-4 border-b border-zinc-200 pb-2 text-xs dark:border-zinc-800">
           <span className="text-zinc-500 dark:text-zinc-400">
-            Avg index <span className="font-medium text-zinc-700 dark:text-zinc-300">{avgIndex.toFixed(1)}</span>
+            Avg index{" "}
+            <span className="font-medium text-zinc-700 dark:text-zinc-300">
+              {formatHandicapIndex(avgIndex)}
+            </span>
           </span>
           <span className="text-zinc-500 dark:text-zinc-400" title="Average expected score after strokes. Lower is better.">
             Avg net <span className="font-medium text-zinc-700 dark:text-zinc-300">{avgNet.toFixed(2)}</span>
@@ -57,8 +61,8 @@ export function TeamPanel({
               <span className="w-4 shrink-0 text-xs tabular-nums text-zinc-400 dark:text-zinc-600">{i + 1}</span>
               <span className="min-w-0 flex-1 truncate text-zinc-900 dark:text-zinc-100">{p.name}</span>
               <TrendBadge trend={p.trend} />
-              <span className="w-9 shrink-0 text-right tabular-nums text-zinc-500 dark:text-zinc-400">
-                {p.handicapIndex.toFixed(1)}
+              <span className="w-11 shrink-0 text-right tabular-nums text-zinc-500 dark:text-zinc-400">
+                {formatHandicapIndex(p.handicapIndex)}
               </span>
             </li>
           ))}

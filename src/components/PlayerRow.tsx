@@ -4,6 +4,7 @@ import { RoundHistory } from "./RoundHistory";
 import { Sparkline } from "./Sparkline";
 import { TrendBadge } from "./TrendBadge";
 import type { CaptainId } from "@/lib/draft";
+import { formatCourseHandicap, formatHandicapIndex } from "@/lib/format";
 import type { RosterPlayer } from "@/types/draft";
 
 function Stat({ label, value, title }: { label: string; value: string; title?: string }) {
@@ -48,14 +49,16 @@ export function PlayerRow({
               <TrendBadge trend={player.trend} />
             </span>
             <span className="mt-0.5 block text-xs text-zinc-500 dark:text-zinc-400">
-              {player.handicapIndex.toFixed(1)} index · plays to {player.eventCourseHandicap.toFixed(0)} ·{" "}
+              {formatHandicapIndex(player.handicapIndex)} index · plays to{" "}
+              {formatCourseHandicap(player.eventCourseHandicap)}{" "}·{" "}
               {player.roundsLogged === 0
                 ? "no rounds logged"
                 : `${player.roundsLogged} round${player.roundsLogged === 1 ? "" : "s"}`}
             </span>
           </span>
 
-          <span className="hidden shrink-0 items-center gap-4 sm:flex">
+          {/* Stats need real room next to the name; below xl they move into the expanded panel. */}
+          <span className="hidden shrink-0 items-center gap-4 xl:flex">
             <Sparkline data={player.trend?.sparklineData ?? []} referenceValue={player.handicapIndex} />
             <Stat
               label="Best ball"
@@ -106,8 +109,8 @@ export function PlayerRow({
 
       {expanded && (
         <div className="border-t border-zinc-200 p-3 dark:border-zinc-800">
-          {/* Stats are hidden on narrow screens in the row above, so repeat them here. */}
-          <div className="mb-3 flex gap-4 sm:hidden">
+          {/* Stats are hidden in the row above at this width, so repeat them here. */}
+          <div className="mb-3 flex gap-4 lg:hidden">
             <Stat label="Best ball" value={`#${player.bestBallRank}`} />
             <Stat label="Singles" value={`#${player.singlesRank}`} />
             <Stat label="Net" value={player.expectedNetBestBall.toFixed(1)} />
