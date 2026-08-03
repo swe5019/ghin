@@ -29,8 +29,10 @@ export function TrendBadge({ trend }: { trend: TrendResult | null }) {
       className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${STYLES[status]}`}
       title={
         trend?.delta !== undefined
-          ? `Avg recent differential ${trend.avgRecent?.toFixed(1)} vs handicap index (${trend.delta > 0 ? "+" : ""}${trend.delta.toFixed(1)})`
-          : "Not enough recent scores to compute a trend"
+          ? `Averaging ${trend.avgRecent?.toFixed(1)}, which is ${trend.gap?.toFixed(1)} over their index. ` +
+            `The field's typical gap is ${trend.fieldGap?.toFixed(1)}, so they're ${Math.abs(trend.delta).toFixed(1)} ` +
+            `${trend.delta > 0 ? "worse" : "better"} than the field norm.`
+          : "Fewer than 3 rounds logged — not enough to compute a trend"
       }
     >
       {ARROWS[status]} {LABELS[status]}

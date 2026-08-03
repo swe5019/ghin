@@ -26,15 +26,26 @@ OneDrive` GitHub Action whenever the spreadsheet changes.
 
 - `src/lib/workbook.ts` parses `Round Log` (per-round differentials) and `Golfer
   Summary` (the spreadsheet's own handicap-weighted Draft Rank) out of the xlsx.
-- `src/lib/trend.ts` compares a golfer's recent differentials to their Handicap Index
-  to flag Hot/Cold/Steady (needs 3+ rounds logged).
-- `src/lib/courses.ts` computes each golfer's Course Handicap for the event's three
-  rounds (`data/courses.json`: rating/slope/par per course, 90% stroke allowance) -
-  used instead of a generic Handicap Index since these courses' slopes (124-137) are
-  all at or above the 113 average, so real strokes-in-play differ from the raw index.
-- `src/lib/bestball.ts` combines recent form, round-to-round consistency, and distance
-  from the sweet-spot handicap (~13.5, using the course-adjusted handicap) into a
-  separate "Best-Ball Value" rank - weights are named constants, tune as needed.
+- `src/lib/courses.ts` computes Course Handicaps from `data/courses.json`
+  (rating/slope/par and a per-round `allowancePct`). USGA/WHS standard is 90% for
+  four-ball and 100% for singles; this event uses 90% throughout.
+- `src/lib/ranking.ts` produces the Best Ball / Singles / Overall ranks. Three ideas
+  drive it:
+  1. **A Handicap Index is potential, not average** - it's the mean of a golfer's best
+     8 of 20 differentials, so nearly everyone shoots worse than their index (this
+     field's median shortfall, the "gap", is ~1.3). Gap is what actually varies
+     between golfers.
+  2. **Expected net = (1 − allowance) × index + gap.** With strokes applied, the index
+     only matters to the extent it isn't handed back, and gap does the real work.
+  3. **Best ball rewards upside; singles rewards expectation.** You count the better
+     ball, so a partner's blow-ups get absorbed and their hot rounds get captured -
+     hence separate ranks, blended ⅔/⅓ to match two best-ball rounds plus one singles.
+
+  Small samples (1-2 rounds) are shrunk toward the field median, and field priors use
+  medians rather than means because a few tiny-sample outliers skew the tail.
+- `src/lib/trend.ts` flags Hot/Cold/Steady by comparing a golfer's gap to the *field's*
+  typical gap (not to their index — that would label nearly everyone "cold"). Needs 3+
+  rounds logged.
 
 ## Deployment
 

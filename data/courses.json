@@ -1,5 +1,5 @@
 {
-  "strokeAllowancePct": 0.9,
+  "_comment": "allowancePct is per-round. USGA/WHS standard is 90% for four-ball (best ball) match play and 100% for singles match play; set to 0.9 across the board here per the group's stated rule. Change the singles round to 1.0 if you want the USGA default.",
   "rounds": [
     {
       "round": "Friday AM",
@@ -8,7 +8,8 @@
       "tees": "Blue",
       "rating": 72.8,
       "slope": 137,
-      "par": 72
+      "par": 72,
+      "allowancePct": 0.9
     },
     {
       "round": "Friday PM",
@@ -17,7 +18,8 @@
       "tees": "Blue/White",
       "rating": 72.4,
       "slope": 135,
-      "par": 72
+      "par": 72,
+      "allowancePct": 0.9
     },
     {
       "round": "Saturday",
@@ -26,7 +28,8 @@
       "tees": "Blue",
       "rating": 70,
       "slope": 124,
-      "par": 71
+      "par": 71,
+      "allowancePct": 0.9
     }
   ]
 }

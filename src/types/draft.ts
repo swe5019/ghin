@@ -4,19 +4,23 @@ export interface RosterPlayer {
   name: string;
   handicapIndex: number;
   roundsLogged: number;
-  /** Draft Rank as computed by the spreadsheet itself (handicap-weighted, no consistency/sweet-spot). */
+  /** Draft Rank as computed by the spreadsheet itself (0.7 x index + 0.3 x avg differential). */
   draftRank: number;
-  /**
-   * Best-Ball Value rank: accounts for consistency and the mid-handicap "sweet spot"
-   * in addition to recent form. Null when there aren't enough rounds logged to compute it meaningfully.
-   */
-  bestBallRank: number | null;
-  bestBallScore: number | null;
-  /** Sample standard deviation of this golfer's round differentials. Null if fewer than 2 rounds logged. */
-  consistency: number | null;
+  /** Ranks from lib/ranking.ts, based on expected score after strokes. 1 = best. */
+  bestBallRank: number;
+  singlesRank: number;
+  overallRank: number;
+  /** Expected net score after strokes in a best-ball round. Lower is better. */
+  expectedNetBestBall: number;
+  /** A good (not best-ever) round net of strokes — what a best-ball partner contributes. */
+  upsideBestBall: number;
+  /** Round-to-round spread, shrunk toward the field for small samples. */
+  spread: number;
   /** Average Course Handicap across the event's 3 rounds, given the actual course slopes. */
   eventCourseHandicap: number;
   trend: TrendResult | null;
+  /** True when this golfer has no logged rounds, so their numbers fall back to the field average. */
+  insufficientData: boolean;
   /** Set when this player's data couldn't be resolved from the workbook; player is still draftable. */
   error?: string;
 }
@@ -24,6 +28,8 @@ export interface RosterPlayer {
 export interface RosterResponse {
   players: RosterPlayer[];
   fetchedAt: string;
+  /** The field's average gap-to-index — the baseline trend is measured against. */
+  fieldGap?: number;
   /** Set when the whole roster load failed (e.g. workbook missing/unreadable). */
   error?: string;
 }

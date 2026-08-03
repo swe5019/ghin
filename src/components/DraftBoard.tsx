@@ -17,13 +17,14 @@ function loadDraftState(): DraftState {
   }
 }
 
-type SortMode = "draftRank" | "bestBall" | "trend" | "name";
+type SortMode = "overall" | "bestBall" | "singles" | "draftRank" | "trend" | "name";
 
 const TREND_ORDER: Record<string, number> = { hot: 0, steady: 1, cold: 2, insufficient_data: 3 };
 
 export function DraftBoard({ initialRoster }: { initialRoster: RosterResponse }) {
   const [roster, setRoster] = useState<RosterPlayer[]>(initialRoster.players);
   const [fetchedAt, setFetchedAt] = useState<string | null>(initialRoster.fetchedAt);
+  const [fieldGap, setFieldGap] = useState<number | undefined>(initialRoster.fieldGap);
   const [loadError, setLoadError] = useState<string | null>(initialRoster.error ?? null);
   const [refreshing, setRefreshing] = useState(false);
   // Draft picks are undefined until mount (SSR has no localStorage); this component only
@@ -51,6 +52,7 @@ export function DraftBoard({ initialRoster }: { initialRoster: RosterResponse })
       setLoadError(body.error ?? null);
       setRoster(body.players ?? []);
       setFetchedAt(body.fetchedAt ?? null);
+      setFieldGap(body.fieldGap);
     } catch (err) {
       setLoadError(`Failed to reach the server: ${(err as Error).message}`);
     } finally {
@@ -86,7 +88,7 @@ export function DraftBoard({ initialRoster }: { initialRoster: RosterResponse })
     setDraft(EMPTY_DRAFT);
   }
 
-  const [sortMode, setSortMode] = useState<SortMode>("bestBall");
+  const [sortMode, setSortMode] = useState<SortMode>("overall");
   const [filterText, setFilterText] = useState("");
 
   const teamOf = (name: string): TeamId => assignments[name] ?? "pool";
@@ -101,12 +103,10 @@ export function DraftBoard({ initialRoster }: { initialRoster: RosterResponse })
 
     players = [...players].sort((a, b) => {
       if (sortMode === "name") return a.name.localeCompare(b.name);
+      if (sortMode === "overall") return a.overallRank - b.overallRank;
+      if (sortMode === "bestBall") return a.bestBallRank - b.bestBallRank;
+      if (sortMode === "singles") return a.singlesRank - b.singlesRank;
       if (sortMode === "draftRank") return a.draftRank - b.draftRank;
-      if (sortMode === "bestBall") {
-        if (a.bestBallRank === null) return 1;
-        if (b.bestBallRank === null) return -1;
-        return a.bestBallRank - b.bestBallRank;
-      }
       const at = TREND_ORDER[a.trend?.status ?? "insufficient_data"];
       const bt = TREND_ORDER[b.trend?.status ?? "insufficient_data"];
       return at - bt;
@@ -124,11 +124,12 @@ export function DraftBoard({ initialRoster }: { initialRoster: RosterResponse })
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-200 pb-3 dark:border-zinc-800">
         <div>
           <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">GHIN Draft Assistant</h1>
-          {fetchedAt && (
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              Data as of {new Date(fetchedAt).toLocaleTimeString()}
-            </p>
-          )}
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            Ranked by expected score after strokes. Best Ball weights upside, Singles weights
+            consistency.
+            {fieldGap !== undefined && ` Trend is vs. the field's typical ${fieldGap.toFixed(1)} over index.`}
+            {fetchedAt && ` · Data as of ${new Date(fetchedAt).toLocaleTimeString()}`}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -175,8 +176,10 @@ export function DraftBoard({ initialRoster }: { initialRoster: RosterResponse })
               onChange={(e) => setSortMode(e.target.value as SortMode)}
               className="rounded border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
             >
-              <option value="bestBall">Sort: Best-Ball Value</option>
-              <option value="draftRank">Sort: Draft Rank</option>
+              <option value="overall">Sort: Overall</option>
+              <option value="bestBall">Sort: Best Ball</option>
+              <option value="singles">Sort: Singles</option>
+              <option value="draftRank">Sort: Spreadsheet Rank</option>
               <option value="trend">Sort: Trend</option>
               <option value="name">Sort: Name</option>
             </select>

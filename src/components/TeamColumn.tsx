@@ -18,7 +18,7 @@ export function TeamColumn({ title, players }: { title: string; players: RosterP
           <p className="text-sm text-zinc-400 dark:text-zinc-600">No players yet</p>
         )}
         {players.map((p) => (
-          <PlayerCard key={p.name} player={p} />
+          <PlayerCard key={p.name} player={p} compact />
         ))}
       </div>
     </div>
