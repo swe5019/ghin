@@ -29,6 +29,18 @@ jobs:
             [ -s "$1" ] && [ "$(head -c 2 "$1")" = "PK" ]
           }
 
+          echo "=== Diagnostic: plain unmodified URL, following redirects ==="
+          curl -sL -D data/_diag_headers.txt -o data/_diag_body.bin \
+            -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36" \
+            -w "effective_url=%{url_effective}\nhttp_code=%{http_code}\ncontent_type=%{content_type}\nsize=%{size_download}\n" \
+            "$SOURCE_URL" || true
+          echo "--- response headers (all redirects) ---"
+          cat data/_diag_headers.txt || true
+          echo "--- first 300 bytes of body ---"
+          head -c 300 data/_diag_body.bin || true
+          echo
+          echo "=== end diagnostic ==="
+
           # Strategy 1: OneDrive for Business / SharePoint "Anyone" share links serve
           # the raw file if you append download=1 to the share URL itself.
           if [[ "$SOURCE_URL" == *"?"* ]]; then
