@@ -12,24 +12,63 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Resolve anonymous OneDrive share link and download the file
+      - name: Download the file from OneDrive/SharePoint
         env:
           SOURCE_URL: ${{ secrets.BIV_TRACKER }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
           if [ -z "${SOURCE_URL:-}" ]; then
             echo "::error::BIV_TRACKER secret is not set"
             exit 1
           fi
-          # Anonymous OneDrive share links are resolved via the documented
-          # "shares" API by base64-encoding the share URL into a token:
-          # https://learn.microsoft.com/onedrive/developer/rest-api/api/shares_get
+          mkdir -p data
+          OUT=data/BCIV_Draft.xlsx
+
+          is_xlsx() {
+            # .xlsx files are zip archives - first two bytes are "PK"
+            [ -s "$1" ] && [ "$(head -c 2 "$1")" = "PK" ]
+          }
+
+          # Strategy 1: OneDrive for Business / SharePoint "Anyone" share links serve
+          # the raw file if you append download=1 to the share URL itself.
+          if [[ "$SOURCE_URL" == *"?"* ]]; then
+            DOWNLOAD_URL="${SOURCE_URL}&download=1"
+          else
+            DOWNLOAD_URL="${SOURCE_URL}?download=1"
+          fi
+          echo "Trying direct download=1 append..."
+          HTTP_CODE=$(curl -sL -w '%{http_code}' -o "$OUT" "$DOWNLOAD_URL")
+          echo "HTTP $HTTP_CODE"
+          if is_xlsx "$OUT"; then
+            echo "Got a valid xlsx via strategy 1."
+            exit 0
+          fi
+
+          # Strategy 2: consumer OneDrive "shares" API (api.onedrive.com), token is
+          # base64(url), url-safe, unpadded, prefixed with "u!".
+          echo "Strategy 1 failed (HTTP $HTTP_CODE, not a valid xlsx). Trying api.onedrive.com shares API..."
           ENCODED=$(printf '%s' "$SOURCE_URL" | base64 -w 0 | tr '/+' '_-' | tr -d '=')
           TOKEN="u!$ENCODED"
-          mkdir -p data
-          curl -L -f --retry 3 -o data/BCIV_Draft.xlsx \
-            "https://api.onedrive.com/v1.0/shares/${TOKEN}/root/content"
-          file data/BCIV_Draft.xlsx
+          HTTP_CODE=$(curl -sL -w '%{http_code}' -o "$OUT" "https://api.onedrive.com/v1.0/shares/${TOKEN}/root/content")
+          echo "HTTP $HTTP_CODE"
+          if is_xlsx "$OUT"; then
+            echo "Got a valid xlsx via strategy 2."
+            exit 0
+          fi
+
+          # Strategy 3: Microsoft Graph shares API, same token format, different host.
+          echo "Strategy 2 failed (HTTP $HTTP_CODE, not a valid xlsx). Trying graph.microsoft.com shares API..."
+          HTTP_CODE=$(curl -sL -w '%{http_code}' -o "$OUT" "https://graph.microsoft.com/v1.0/shares/${TOKEN}/driveItem/content")
+          echo "HTTP $HTTP_CODE"
+          if is_xlsx "$OUT"; then
+            echo "Got a valid xlsx via strategy 3."
+            exit 0
+          fi
+
+          echo "::error::All strategies failed. Last response (first 500 bytes) below - it is likely HTML (a login page or viewer), not the raw file."
+          head -c 500 "$OUT" || true
+          echo
+          exit 1
 
       - name: Commit updated file
         run: |
