@@ -12,75 +12,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download the file from OneDrive/SharePoint
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Download the file from OneDrive
         env:
-          SOURCE_URL: ${{ secrets.BCIV_TRACKER }}
-        run: |
-          set -uo pipefail
-          if [ -z "${SOURCE_URL:-}" ]; then
-            echo "::error::BCIV_TRACKER secret is not set"
-            exit 1
-          fi
-          mkdir -p data
-          OUT=data/BCIV_Draft.xlsx
-
-          is_xlsx() {
-            # .xlsx files are zip archives - first two bytes are "PK"
-            [ -s "$1" ] && [ "$(head -c 2 "$1")" = "PK" ]
-          }
-
-          echo "=== Diagnostic: plain unmodified URL, following redirects ==="
-          curl -sL -D data/_diag_headers.txt -o data/_diag_body.bin \
-            -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36" \
-            -w "effective_url=%{url_effective}\nhttp_code=%{http_code}\ncontent_type=%{content_type}\nsize=%{size_download}\n" \
-            "$SOURCE_URL" || true
-          echo "--- response headers (all redirects) ---"
-          cat data/_diag_headers.txt || true
-          echo "--- first 300 bytes of body ---"
-          head -c 300 data/_diag_body.bin || true
-          echo
-          echo "=== end diagnostic ==="
-
-          # Strategy 1: OneDrive for Business / SharePoint "Anyone" share links serve
-          # the raw file if you append download=1 to the share URL itself.
-          if [[ "$SOURCE_URL" == *"?"* ]]; then
-            DOWNLOAD_URL="${SOURCE_URL}&download=1"
-          else
-            DOWNLOAD_URL="${SOURCE_URL}?download=1"
-          fi
-          echo "Trying direct download=1 append..."
-          HTTP_CODE=$(curl -sL -w '%{http_code}' -o "$OUT" "$DOWNLOAD_URL")
-          echo "HTTP $HTTP_CODE"
-          if is_xlsx "$OUT"; then
-            echo "Got a valid xlsx via strategy 1."
-            exit 0
-          fi
-
-          # Strategy 2: consumer OneDrive "shares" API (api.onedrive.com), token is
-          # base64(url), url-safe, unpadded, prefixed with "u!".
-          echo "Strategy 1 failed (HTTP $HTTP_CODE, not a valid xlsx). Trying api.onedrive.com shares API..."
-          ENCODED=$(printf '%s' "$SOURCE_URL" | base64 -w 0 | tr '/+' '_-' | tr -d '=')
-          TOKEN="u!$ENCODED"
-          HTTP_CODE=$(curl -sL -w '%{http_code}' -o "$OUT" "https://api.onedrive.com/v1.0/shares/${TOKEN}/root/content")
-          echo "HTTP $HTTP_CODE"
-          if is_xlsx "$OUT"; then
-            echo "Got a valid xlsx via strategy 2."
-            exit 0
-          fi
-
-          # Strategy 3: Microsoft Graph shares API, same token format, different host.
-          echo "Strategy 2 failed (HTTP $HTTP_CODE, not a valid xlsx). Trying graph.microsoft.com shares API..."
-          HTTP_CODE=$(curl -sL -w '%{http_code}' -o "$OUT" "https://graph.microsoft.com/v1.0/shares/${TOKEN}/driveItem/content")
-          echo "HTTP $HTTP_CODE"
-          if is_xlsx "$OUT"; then
-            echo "Got a valid xlsx via strategy 3."
-            exit 0
-          fi
-
-          echo "::error::All strategies failed. Last response (first 500 bytes) below - it is likely HTML (a login page or viewer), not the raw file."
-          head -c 500 "$OUT" || true
-          echo
-          exit 1
+          BCIV_TRACKER: ${{ secrets.BCIV_TRACKER }}
+        run: python scripts/fetch_onedrive_file.py
 
       - name: Commit updated file
         run: |
