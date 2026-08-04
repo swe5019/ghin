@@ -58,11 +58,12 @@ export function DraftBoard({ initialRoster }: { initialRoster: RosterResponse })
     if (draft) window.localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
   }, [draft]);
 
-  async function refresh() {
-    setRefreshing(true);
+  async function loadRoster({ manual }: { manual: boolean }) {
+    if (manual) setRefreshing(true);
     try {
       const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
-      const res = await fetch(`${basePath}/roster.json?t=${Date.now()}`);
+      const res = await fetch(`${basePath}/roster.json?t=${Date.now()}`, { cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const body = (await res.json()) as RosterResponse;
       setLoadError(body.error ?? null);
       setRoster(body.players ?? []);
@@ -70,11 +71,23 @@ export function DraftBoard({ initialRoster }: { initialRoster: RosterResponse })
       setFieldGap(body.fieldGap);
       setDraftConfig(body.draft);
     } catch (err) {
-      setLoadError(`Couldn't reload the roster: ${(err as Error).message}`);
+      // On a background load, keep the build-time data rather than blanking the board;
+      // only a manual refresh surfaces the failure.
+      if (manual) setLoadError(`Couldn't reload the roster: ${(err as Error).message}`);
     } finally {
-      setRefreshing(false);
+      if (manual) setRefreshing(false);
     }
   }
+
+  // Page data is baked in at build time, and GitHub Pages caches the HTML — so a stale
+  // bundle would otherwise show stale rankings. Re-fetching roster.json on mount makes
+  // data freshness independent of how long the HTML is cached for.
+  useEffect(() => {
+    // Syncing from the network is what effects are for, and the setState calls happen in
+    // the async continuation rather than synchronously in this body.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadRoster({ manual: false });
+  }, []);
 
   const assignments = draft?.assignments ?? {};
   const pickHistory = draft?.pickHistory ?? [];
@@ -108,6 +121,9 @@ export function DraftBoard({ initialRoster }: { initialRoster: RosterResponse })
   function resetDraft() {
     setDraft((prev) => ({ ...EMPTY_DRAFT, myCaptain: prev?.myCaptain ?? "A" }));
   }
+
+  // Surfaced in the footer as a quick "is this the data I expect?" check.
+  const roundsTotal = roster.reduce((sum, p) => sum + p.roundsLogged, 0);
 
   const teamOf = (name: string): TeamId => assignments[name] ?? "pool";
 
@@ -172,7 +188,7 @@ export function DraftBoard({ initialRoster }: { initialRoster: RosterResponse })
             Reset
           </button>
           <button
-            onClick={refresh}
+            onClick={() => void loadRoster({ manual: true })}
             disabled={refreshing}
             className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
           >
@@ -257,7 +273,11 @@ export function DraftBoard({ initialRoster }: { initialRoster: RosterResponse })
           />
           {fetchedAt && (
             <p className="text-center text-xs text-zinc-400 dark:text-zinc-600">
-              Data as of {new Date(fetchedAt).toLocaleString()}
+              Roster data built {new Date(fetchedAt).toLocaleString()}
+              <br />
+              <span className="opacity-75">
+                {roundsTotal} rounds across {roster.length} golfers
+              </span>
             </p>
           )}
         </div>
