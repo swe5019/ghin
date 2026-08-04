@@ -1,5 +1,6 @@
 "use client";
 
+import { CupDetail, CupSummary } from "./CupRecord";
 import { RoundHistory } from "./RoundHistory";
 import { Sparkline } from "./Sparkline";
 import { TrendBadge } from "./TrendBadge";
@@ -54,6 +55,12 @@ export function PlayerRow({
               {player.roundsLogged === 0
                 ? "no rounds logged"
                 : `${player.roundsLogged} round${player.roundsLogged === 1 ? "" : "s"}`}
+              {player.cup && (
+                <>
+                  {" · "}
+                  <CupSummary player={player} />
+                </>
+              )}
             </span>
           </span>
 
@@ -115,6 +122,12 @@ export function PlayerRow({
             <Stat label="Singles" value={`#${player.singlesRank}`} />
             <Stat label="Net" value={player.expectedNetBestBall.toFixed(1)} />
             <Stat label="Upside" value={player.upsideBestBall.toFixed(1)} />
+          </div>
+          <div className="mb-3 rounded-md bg-zinc-50 p-3 dark:bg-zinc-900">
+            <p className="mb-2 text-[10px] uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+              Barnard Cup career
+            </p>
+            <CupDetail player={player} />
           </div>
           <RoundHistory player={player} />
         </div>

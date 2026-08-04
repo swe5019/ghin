@@ -1,5 +1,23 @@
 import type { CaptainId } from "@/lib/draft";
+import type { Partnership, Record3 } from "@/lib/cup-history";
 import type { TrendResult } from "@/lib/trend";
+
+/** Career Barnard Cup record, attached to a roster player. */
+export interface CupRecord {
+  apps: number;
+  record: string;
+  pts: number;
+  pointsPerCup: number;
+  cupTitles: number;
+  h2h: Record3;
+  h2hWinPct: number | null;
+  fourball: Record3;
+  fourballWinPct: number | null;
+  singles: Record3;
+  singlesWinPct: number | null;
+  /** Index change since their last cup. Negative = improved since the record was set. */
+  handicapDrift: number | null;
+}
 
 /** One logged round, as shown in a golfer's expanded detail view. */
 export interface PlayerRound {
@@ -38,6 +56,10 @@ export interface RosterPlayer {
   trend: TrendResult | null;
   /** This golfer's logged rounds, oldest first. */
   rounds: PlayerRound[];
+  /** Career Barnard Cup record, or null if they've never played one. */
+  cup: CupRecord | null;
+  /** This golfer's past two-man pairings, best first. */
+  partnerships: Partnership[];
   /** True when this golfer has no logged rounds, so their numbers fall back to the field average. */
   insufficientData: boolean;
   /** Set when this player's data couldn't be resolved from the workbook; player is still draftable. */
