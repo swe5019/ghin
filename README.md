@@ -19,8 +19,10 @@ needed - it's read fresh per-request, see `src/app/page.tsx`).
 1. `npm install`
 2. `npm run dev` and open http://localhost:3000.
 
-`data/BCIV_Draft.xlsx` is already committed; re-run the `Sync player roster from
-OneDrive` GitHub Action whenever the spreadsheet changes.
+`data/BCIV_Draft.xlsx` is already committed. A scheduled workflow re-pulls it from
+OneDrive every 3 hours and redeploys when it changes, so spreadsheet edits reach the
+live site on their own; run `Sync player roster from OneDrive` manually from the
+Actions tab when you want an edit live right away.
 
 ### Logging 9-hole rounds
 

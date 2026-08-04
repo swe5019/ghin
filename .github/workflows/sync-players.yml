@@ -1,6 +1,13 @@
 name: Sync player roster from OneDrive
 
 on:
+  # Poll OneDrive on a schedule so spreadsheet edits reach the site on their own.
+  # Minute 17 rather than 0: GitHub heavily contends scheduled runs on the hour and
+  # delays them, so an off-peak minute actually fires closer to on time.
+  schedule:
+    - cron: "17 */3 * * *"
+  # Still runnable on demand — use this when you want an edit live immediately
+  # (e.g. right before the draft) instead of waiting for the next scheduled run.
   workflow_dispatch:
 
 permissions:

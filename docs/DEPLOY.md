@@ -23,17 +23,24 @@ subpath hosting), then publishes `out/` via `actions/deploy-pages`.
 
 ## Keeping the roster current
 
-1. Update the spreadsheet in OneDrive.
-2. Go to **Actions → Sync player roster from OneDrive → Run workflow**. It fetches the
-   file (via the `BCIV_TRACKER` anonymous share-link secret) and commits
-   `data/BCIV_Draft.xlsx`.
-3. That success automatically triggers **Deploy to GitHub Pages**, which rebuilds
-   (baking the new roster data into the static site) and redeploys.
+**Automatic:** `sync-players.yml` runs every 3 hours. It pulls the workbook from
+OneDrive (via the `BCIV_TRACKER` anonymous share-link secret), and if the file actually
+changed it commits `data/BCIV_Draft.xlsx`. That triggers **Deploy to GitHub Pages**,
+which rebuilds with the new data and redeploys. So a spreadsheet edit reaches the live
+site within ~3 hours with no action needed.
 
-The "Refresh data" button on the page re-fetches `roster.json` from the *currently
-deployed* build — useful if a deploy happened in the background while the tab was
-open, but it doesn't pull live spreadsheet data (the site is fully static; getting new
-data always means re-running the sync + redeploy above).
+**On demand:** to make an edit live immediately — right before or during the draft —
+go to **Actions → Sync player roster from OneDrive → Run workflow**. Takes about a
+minute end to end.
+
+Note the sync runs on a schedule regardless of whether anything changed. When nothing
+has, it commits nothing, but the chained deploy still rebuilds the same content — a
+harmless no-op that keeps the Actions tab a little busier than strictly necessary.
+
+The **Refresh** button in the app re-fetches `roster.json` from the *currently deployed*
+build. It does not read the spreadsheet — the site is fully static, so new spreadsheet
+data always arrives via the sync + redeploy above. Refresh is useful for picking up a
+deploy that landed while your tab was already open.
 
 ## Caveats — read before the draft
 
