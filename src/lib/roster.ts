@@ -68,7 +68,9 @@ export async function getRoster(): Promise<RosterResponse> {
       return {
         name: s.name,
         handicapIndex: s.handicapIndex,
-        roundsLogged: s.roundsLogged,
+        // Count the rounds we actually parsed rather than the sheet's own tally, whose
+        // formula range starts a row late and so undercounts the first golfer logged.
+        roundsLogged: playerRounds.length,
         draftRank: s.draftRank,
         bestBallRank: r.bestBallRank,
         singlesRank: r.singlesRank,

@@ -100,14 +100,25 @@ export async function loadWorkbookData(): Promise<WorkbookData> {
 
   const rounds: RoundEntry[] = [];
   // Header row is row 4: Golfer Name | Date | Course Name | Tees Played | Course Rating | Slope Rating | Score (Gross) | Handicap Differential
-  // Row 5 is a template/example row the workbook's own formulas exclude (they range over $A$6:$A$65), so start at 6.
+  // Data starts on row 5. The sheet's own summary formulas range over $A$6:$A$65 and so miss
+  // row 5 — we deliberately don't copy that bug, since row 5 is a real logged round.
   roundLog.eachRow({ includeEmpty: false }, (row, rowNumber) => {
-    if (rowNumber <= 5) return;
+    if (rowNumber <= ROUND_LOG_HEADER_ROW) return;
     const golferName = cellString(row.getCell(1).value);
-    const rawDifferential = cellNumber(row.getCell(8).value);
     const dateValue = row.getCell(2).value;
     const date = dateValue instanceof Date ? dateValue : null;
     const courseRating = cellNumber(row.getCell(5).value);
+    const slopeRating = cellNumber(row.getCell(6).value);
+    const grossScore = cellNumber(row.getCell(7).value);
+
+    // The Differential column is a formula. Excel caches its result, but a row the sheet's
+    // own ranges never referenced can arrive with no cached value — so fall back to the
+    // standard differential formula the cell itself uses.
+    const rawDifferential =
+      cellNumber(row.getCell(8).value) ??
+      (courseRating !== null && slopeRating !== null && slopeRating > 0 && grossScore !== null
+        ? ((grossScore - courseRating) * 113) / slopeRating
+        : null);
 
     // Prefer an explicit Holes column; otherwise infer from the Course Rating, since
     // 9-hole ratings (~33-37) and 18-hole ratings (60+) don't overlap.
@@ -127,8 +138,8 @@ export async function loadWorkbookData(): Promise<WorkbookData> {
         courseName: cellString(row.getCell(3).value),
         tees: cellString(row.getCell(4).value),
         courseRating,
-        slopeRating: cellNumber(row.getCell(6).value),
-        grossScore: cellNumber(row.getCell(7).value),
+        slopeRating,
+        grossScore,
       });
     }
   });

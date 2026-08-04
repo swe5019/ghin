@@ -7,6 +7,8 @@ export type CaptainId = "A" | "B";
 
 export interface DraftConfig {
   captains: Record<CaptainId, string>;
+  /** Which captain is the person using the board — seeds the "I am" selector. */
+  me: CaptainId;
   pickOrder: CaptainId[];
 }
 

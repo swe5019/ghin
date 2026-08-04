@@ -7,8 +7,9 @@ import { TeamPanel } from "./TeamPanel";
 import type { CaptainId } from "@/lib/draft";
 import type { DraftState, RosterPlayer, RosterResponse, TeamId } from "@/types/draft";
 
-const STORAGE_KEY = "ghin-draft-state-v2";
-const EMPTY_DRAFT: DraftState = { assignments: {}, pickHistory: [], myCaptain: "A" };
+// Bumped when the captain slots changed meaning, so a stale saved draft can't mislabel teams.
+const STORAGE_KEY = "ghin-draft-state-v3";
+const EMPTY_DRAFT: DraftState = { assignments: {}, pickHistory: [] };
 
 function loadDraftState(): DraftState {
   try {
@@ -91,7 +92,8 @@ export function DraftBoard({ initialRoster }: { initialRoster: RosterResponse })
 
   const assignments = draft?.assignments ?? {};
   const pickHistory = draft?.pickHistory ?? [];
-  const myCaptain: CaptainId = draft?.myCaptain ?? "A";
+  // Config says which captain this board belongs to; the selector only overrides it.
+  const myCaptain: CaptainId = draft?.myCaptain ?? draftConfig?.me ?? "A";
   const pickOrder = draftConfig?.pickOrder ?? [];
   const captains = draftConfig?.captains ?? { A: "Captain A", B: "Captain B" };
   const onTheClock: CaptainId | null = pickHistory.length < pickOrder.length ? pickOrder[pickHistory.length] : null;
@@ -119,7 +121,7 @@ export function DraftBoard({ initialRoster }: { initialRoster: RosterResponse })
   }
 
   function resetDraft() {
-    setDraft((prev) => ({ ...EMPTY_DRAFT, myCaptain: prev?.myCaptain ?? "A" }));
+    setDraft((prev) => ({ ...EMPTY_DRAFT, myCaptain: prev?.myCaptain }));
   }
 
   // Surfaced in the footer as a quick "is this the data I expect?" check.

@@ -1,4 +1,4 @@
-import type { CaptainId } from "@/lib/draft";
+import type { CaptainId, DraftConfig } from "@/lib/draft";
 import type { Partnership, Record3 } from "@/lib/cup-history";
 import type { TrendResult } from "@/lib/trend";
 
@@ -72,7 +72,7 @@ export interface RosterResponse {
   /** The field's median gap-to-index — the baseline trend is measured against. */
   fieldGap?: number;
   /** Draft pick order and captain names. */
-  draft?: { captains: Record<CaptainId, string>; pickOrder: CaptainId[] };
+  draft?: DraftConfig;
   /** Set when the whole roster load failed (e.g. workbook missing/unreadable). */
   error?: string;
 }
@@ -84,6 +84,9 @@ export interface DraftState {
   assignments: Record<string, TeamId>;
   /** Player names in pick order, for undo and for knowing which pick we're on. */
   pickHistory: string[];
-  /** Which captain the user is, so the board can highlight their turn. */
-  myCaptain: CaptainId;
+  /**
+   * Which captain the user is, so the board can highlight their turn. Undefined until
+   * they pick one, in which case the board falls back to `me` from the draft config.
+   */
+  myCaptain?: CaptainId;
 }

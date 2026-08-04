@@ -1,8 +1,9 @@
 {
-  "_comment": "16 players = 2 captains + 14 picks. Captains play but aren't drafted, so they're auto-assigned to their own teams and excluded from the pool. Pick order alternates except Captain B takes back-to-back at 6 and 7, leaving each captain with 7 picks.",
+  "_comment": "16 players = 2 captains + 14 picks. Captains play but aren't drafted, so they're auto-assigned to their own teams and excluded from the pool. Pick order alternates except Captain B takes back-to-back at 6 and 7, leaving each captain with 7 picks. `me` seeds the 'I am' selector.",
   "captains": {
-    "A": "Stephen Ebeck",
-    "B": "Paul Schappell"
+    "A": "Paul Schappell",
+    "B": "Stephen Ebeck"
   },
+  "me": "B",
   "pickOrder": ["A", "B", "A", "B", "A", "B", "B", "A", "B", "A", "B", "A", "B", "A"]
 }
