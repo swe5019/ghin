@@ -52,9 +52,9 @@ export function DraftStatusBar({
           )}
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex flex-1 flex-wrap items-center justify-between gap-3 sm:flex-none sm:justify-end sm:gap-4">
           {!complete && !myTurn && untilMyTurn !== null && (
-            <div className="text-right">
+            <div className="sm:text-right">
               <p className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Your next pick</p>
               <p className="font-semibold text-zinc-900 dark:text-zinc-100">
                 in {untilMyTurn} {untilMyTurn === 1 ? "pick" : "picks"}
@@ -62,7 +62,7 @@ export function DraftStatusBar({
             </div>
           )}
           {!complete && myTurn && goneBeforeNext !== null && (
-            <div className="text-right">
+            <div className="sm:text-right">
               <p className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                 Off the board before your next
               </p>
@@ -86,8 +86,9 @@ export function DraftStatusBar({
         </div>
       </div>
 
-      {/* Pick order strip — shows the full sequence and where we are in it. */}
-      <div className="mt-3 flex gap-1 overflow-x-auto pb-1">
+      {/* Pick order strip — shows the full sequence and where we are in it. Sized so all
+          14 fit across a narrow phone rather than needing a sideways scroll. */}
+      <div className="mt-3 flex gap-0.5 overflow-x-auto pb-1 sm:gap-1">
         {pickOrder.map((captain, i) => {
           const done = i < pickIndex;
           const current = i === pickIndex;
@@ -96,7 +97,7 @@ export function DraftStatusBar({
             <div
               key={i}
               title={`Pick ${i + 1}: ${captains[captain]}`}
-              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded text-xs font-semibold ${
+              className={`flex h-6 min-w-0 flex-1 items-center justify-center rounded text-xs font-semibold sm:h-7 sm:w-7 sm:flex-none sm:shrink-0 ${
                 current
                   ? "bg-zinc-900 text-white ring-2 ring-zinc-900 ring-offset-1 dark:bg-zinc-100 dark:text-zinc-900 dark:ring-zinc-100 dark:ring-offset-zinc-950"
                   : done

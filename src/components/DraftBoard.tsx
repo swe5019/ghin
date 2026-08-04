@@ -188,11 +188,12 @@ export function DraftBoard({ initialRoster }: { initialRoster: RosterResponse })
     pickOrder.slice(pickHistory.length).filter((c) => c === captain).length;
 
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-4 p-4">
+    <div className="mx-auto flex max-w-7xl flex-col gap-3 p-3 sm:gap-4 sm:p-4">
       <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0 flex-1">
           <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">BCIV Draft Board</h1>
-          <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+          {/* Explanatory copy costs a lot of vertical space on a phone; keep it for wider screens. */}
+          <p className="mt-0.5 hidden text-xs text-zinc-500 sm:block dark:text-zinc-400">
             Ranked by expected score after strokes — best ball weights upside, singles weights consistency.
             {fieldGap !== undefined && ` Trend compares to the field's typical ${fieldGap.toFixed(1)} over index.`}
           </p>
@@ -247,7 +248,7 @@ export function DraftBoard({ initialRoster }: { initialRoster: RosterResponse })
               value={filterText}
               onChange={(e) => setFilterText(e.target.value)}
               placeholder="Search…"
-              className="ml-auto w-32 rounded-md border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+              className="ml-auto w-24 rounded-md border border-zinc-300 px-2 py-1 text-sm sm:w-32 dark:border-zinc-700 dark:bg-zinc-900"
             />
             <select
               value={sortMode}

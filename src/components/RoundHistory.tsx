@@ -50,23 +50,26 @@ export function RoundHistory({ player }: { player: RosterPlayer }) {
 
   return (
     <div className="overflow-x-auto rounded-md bg-zinc-50 dark:bg-zinc-900">
-      <table className="w-full min-w-[26rem] text-left text-sm">
+      {/* Course is the widest column and the least load-bearing — dropping it on a phone
+          keeps the rest on screen without a sideways scroll. A 9-hole round is still
+          marked by the ×2 on its differential. */}
+      <table className="w-full text-left text-sm sm:min-w-[26rem]">
         <thead>
           <tr className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-            <th className="px-3 py-2 font-medium">When</th>
-            <th className="px-3 py-2 font-medium">Course</th>
-            <th className="px-3 py-2 text-right font-medium">Score</th>
-            <th className="px-3 py-2 text-right font-medium">Rating/Slope</th>
-            <th className="px-3 py-2 text-right font-medium">Diff</th>
+            <th className="px-2 py-2 font-medium sm:px-3">When</th>
+            <th className="hidden px-3 py-2 font-medium sm:table-cell">Course</th>
+            <th className="px-2 py-2 text-right font-medium sm:px-3">Score</th>
+            <th className="px-2 py-2 text-right font-medium sm:px-3">Rating/Slope</th>
+            <th className="px-2 py-2 text-right font-medium sm:px-3">Diff</th>
           </tr>
         </thead>
         <tbody>
           {sorted.map((round, i) => (
             <tr key={i} className="border-t border-zinc-200 dark:border-zinc-800">
-              <td className="whitespace-nowrap px-3 py-2 text-zinc-600 dark:text-zinc-400">
+              <td className="whitespace-nowrap px-2 py-2 text-zinc-600 sm:px-3 dark:text-zinc-400">
                 {formatRoundDate(round.date)}
               </td>
-              <td className="px-3 py-2 text-zinc-600 dark:text-zinc-400">
+              <td className="hidden px-3 py-2 text-zinc-600 sm:table-cell dark:text-zinc-400">
                 {round.courseName ?? "—"}
                 {round.tees ? ` (${round.tees})` : ""}
                 {round.holes === 9 && (
@@ -75,15 +78,15 @@ export function RoundHistory({ player }: { player: RosterPlayer }) {
                   </span>
                 )}
               </td>
-              <td className="px-3 py-2 text-right tabular-nums text-zinc-900 dark:text-zinc-100">
+              <td className="px-2 py-2 text-right tabular-nums text-zinc-900 sm:px-3 dark:text-zinc-100">
                 {round.grossScore ?? "—"}
               </td>
-              <td className="px-3 py-2 text-right tabular-nums text-zinc-500 dark:text-zinc-400">
+              <td className="px-2 py-2 text-right tabular-nums text-zinc-500 sm:px-3 dark:text-zinc-400">
                 {round.courseRating !== null && round.slopeRating !== null
                   ? `${round.courseRating.toFixed(1)}/${round.slopeRating}`
                   : "—"}
               </td>
-              <td className="px-3 py-2 text-right tabular-nums">
+              <td className="px-2 py-2 text-right tabular-nums sm:px-3">
                 <DiffCell round={round} index={player.handicapIndex} />
               </td>
             </tr>

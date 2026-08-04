@@ -34,7 +34,9 @@ export function PlayerRow({
 }) {
   return (
     <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
-      <div className="flex items-center gap-3 p-3">
+      {/* On a phone the draft buttons get their own full-width row, so the name isn't
+          squeezed down to a single letter. From sm up it's one horizontal row. */}
+      <div className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:gap-3">
         <button
           onClick={onToggle}
           aria-expanded={expanded}
@@ -95,12 +97,12 @@ export function PlayerRow({
         </button>
 
         {onDraft && captains && (
-          <div className="flex shrink-0 gap-1">
+          <div className="flex shrink-0 gap-1.5">
             {(["A", "B"] as CaptainId[]).map((c) => (
               <button
                 key={c}
                 onClick={() => onDraft(c)}
-                className={`rounded px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                className={`flex-1 rounded px-2.5 py-2 text-xs font-medium transition-colors sm:flex-none sm:py-1.5 ${
                   onTheClock === c
                     ? "bg-emerald-600 text-white hover:bg-emerald-700"
                     : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
@@ -116,8 +118,9 @@ export function PlayerRow({
 
       {expanded && (
         <div className="border-t border-zinc-200 p-3 dark:border-zinc-800">
-          {/* Stats are hidden in the row above at this width, so repeat them here. */}
-          <div className="mb-3 flex gap-4 lg:hidden">
+          {/* The row above hides these below xl, so repeat them here at exactly those widths. */}
+          <div className="mb-3 flex flex-wrap items-center gap-4 xl:hidden">
+            <Sparkline data={player.trend?.sparklineData ?? []} referenceValue={player.handicapIndex} />
             <Stat label="Best ball" value={`#${player.bestBallRank}`} />
             <Stat label="Singles" value={`#${player.singlesRank}`} />
             <Stat label="Net" value={player.expectedNetBestBall.toFixed(1)} />
