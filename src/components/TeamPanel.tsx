@@ -5,11 +5,14 @@ import type { RosterPlayer } from "@/types/draft";
 export function TeamPanel({
   title,
   players,
+  hasCaptain,
   isMine,
   picksRemaining,
 }: {
   title: string;
+  /** The captain first (when they're on the roster), then their picks in order. */
   players: RosterPlayer[];
+  hasCaptain: boolean;
   isMine: boolean;
   picksRemaining: number;
 }) {
@@ -34,7 +37,9 @@ export function TeamPanel({
           {isMine && <span className="ml-1.5 text-xs font-normal text-blue-700 dark:text-blue-400">you</span>}
         </h2>
         <span className="text-xs text-zinc-500 dark:text-zinc-400">
-          {players.length} drafted{picksRemaining > 0 && ` · ${picksRemaining} left`}
+          {/* The captain is on the team but wasn't drafted, so they don't count toward picks made. */}
+          {players.length - (hasCaptain ? 1 : 0)} drafted
+          {picksRemaining > 0 && ` · ${picksRemaining} left`}
         </span>
       </div>
 
@@ -58,7 +63,10 @@ export function TeamPanel({
         <ol className="flex flex-col gap-1.5">
           {players.map((p, i) => (
             <li key={p.name} className="flex items-center gap-2 text-sm">
-              <span className="w-4 shrink-0 text-xs tabular-nums text-zinc-400 dark:text-zinc-600">{i + 1}</span>
+              {/* The captain heads the list and wasn't drafted, so they're marked C, not 1. */}
+              <span className="w-4 shrink-0 text-xs tabular-nums text-zinc-400 dark:text-zinc-600">
+                {hasCaptain ? (i === 0 ? "C" : i) : i + 1}
+              </span>
               <span className="min-w-0 flex-1 truncate text-zinc-900 dark:text-zinc-100">{p.name}</span>
               <TrendBadge trend={p.trend} />
               <span className="w-11 shrink-0 text-right tabular-nums text-zinc-500 dark:text-zinc-400">

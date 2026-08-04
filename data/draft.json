@@ -1,8 +1,8 @@
 {
-  "_comment": "14 picks (16 players minus the 2 captains). Not a pure snake — it alternates from pick 1, Captain B takes back-to-back picks at 6 and 7, then it alternates again with B leading. Each captain ends with 7 picks.",
+  "_comment": "16 players = 2 captains + 14 picks. Captains play but aren't drafted, so they're auto-assigned to their own teams and excluded from the pool. Pick order alternates except Captain B takes back-to-back at 6 and 7, leaving each captain with 7 picks.",
   "captains": {
-    "A": "Captain A",
-    "B": "Captain B"
+    "A": "Stephen Ebeck",
+    "B": "Paul Schappell"
   },
   "pickOrder": ["A", "B", "A", "B", "A", "B", "B", "A", "B", "A", "B", "A", "B", "A"]
 }

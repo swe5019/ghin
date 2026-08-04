@@ -125,7 +125,15 @@ export function DraftBoard({ initialRoster }: { initialRoster: RosterResponse })
   // Surfaced in the footer as a quick "is this the data I expect?" check.
   const roundsTotal = roster.reduce((sum, p) => sum + p.roundsLogged, 0);
 
-  const teamOf = (name: string): TeamId => assignments[name] ?? "pool";
+  // Captains play but aren't drafted — they belong to their own team from the start and
+  // never appear in the available pool.
+  const captainOf = (name: string): TeamId | null => {
+    if (name === captains.A) return "A";
+    if (name === captains.B) return "B";
+    return null;
+  };
+
+  const teamOf = (name: string): TeamId => captainOf(name) ?? assignments[name] ?? "pool";
 
   const pool = useMemo(() => {
     let players = roster.filter((p) => teamOf(p.name) === "pool");
@@ -157,8 +165,22 @@ export function DraftBoard({ initialRoster }: { initialRoster: RosterResponse })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roster, assignments, filterText, sortMode]);
 
-  const teamFor = (captain: CaptainId) =>
-    pickHistory.filter((name) => assignments[name] === captain).map((name) => roster.find((p) => p.name === name)!).filter(Boolean);
+  // The captain heads their own list, then their picks in the order they made them. A captain
+  // missing from the roster (name typo in draft.json) just yields a captainless list.
+  const teamFor = (captain: CaptainId) => {
+    const captainPlayer = roster.find((p) => p.name === captains[captain]);
+    const picks = pickHistory
+      .filter((name) => assignments[name] === captain)
+      .map((name) => roster.find((p) => p.name === name)!)
+      .filter(Boolean);
+    return {
+      players: captainPlayer ? [captainPlayer, ...picks] : picks,
+      hasCaptain: Boolean(captainPlayer),
+    };
+  };
+
+  const teamA = teamFor("A");
+  const teamB = teamFor("B");
 
   const picksLeftFor = (captain: CaptainId) =>
     pickOrder.slice(pickHistory.length).filter((c) => c === captain).length;
@@ -261,13 +283,15 @@ export function DraftBoard({ initialRoster }: { initialRoster: RosterResponse })
         <div className="flex flex-col gap-4">
           <TeamPanel
             title={captains.A}
-            players={teamFor("A")}
+            players={teamA.players}
+            hasCaptain={teamA.hasCaptain}
             isMine={myCaptain === "A"}
             picksRemaining={picksLeftFor("A")}
           />
           <TeamPanel
             title={captains.B}
-            players={teamFor("B")}
+            players={teamB.players}
+            hasCaptain={teamB.hasCaptain}
             isMine={myCaptain === "B"}
             picksRemaining={picksLeftFor("B")}
           />
