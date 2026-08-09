@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { isBestBall, type CourseRound } from "@/lib/course-math";
 import {
+  evaluateLineups,
   integrationBounds,
   netDistribution,
   pairDistribution,
@@ -39,6 +40,7 @@ export function PairingsView({ initialRoster }: { initialRoster: RosterResponse 
   const [showAlternatives, setShowAlternatives] = useState(false);
   const [lineupLimit, setLineupLimit] = useState(25);
   const [lineupFilter, setLineupFilter] = useState("");
+  const [lineupSort, setLineupSort] = useState<"matches" | "strokes">("matches");
   const [firstThrow, setFirstThrow] = useState<Side>("them");
   const [events, setEvents] = useState<DraftEvent[]>([]);
   const [picking, setPicking] = useState<string[]>([]);
@@ -182,6 +184,17 @@ export function PairingsView({ initialRoster }: { initialRoster: RosterResponse 
     return { state, actor, decision, options, matches, done, pointsSoFar: matches.reduce((s, m) => s + model.winProb[m.mine][m.theirs], 0) };
   }, [model, events, firstThrow, myPairs, theirPairs]);
 
+  // Every lineup scored by expected matches won against their assumed pairs — the
+  // objective that actually decides the day. Re-runs as they expose pairs.
+  const lineupEvals = useMemo(
+    () =>
+      course && myTeam.length === 8 && theirPairs.length === 4
+        ? evaluateLineups(myTeam.map(toPairing), theirTeam.map(toPairing), theirPairs, course, firstThrow)
+        : [],
+     
+    [myTeam, theirTeam, theirPairs, course, firstThrow],
+  );
+
   // The alternatives list is a menu, so it shows plenty and grows on demand rather than
   // cutting off at an arbitrary handful.
   //
@@ -190,8 +203,11 @@ export function PairingsView({ initialRoster }: { initialRoster: RosterResponse 
   // names ("dave tim") narrows to the lineups that actually put those two together.
   const visibleLineups = useMemo(() => {
     const words = lineupFilter.trim().toLowerCase().split(/\s+/).filter(Boolean);
-    return myLineups
-      .map((lineup, index) => ({ lineup, index }))
+    const ordered =
+      lineupSort === "matches"
+        ? lineupEvals
+        : [...lineupEvals].sort((a, b) => a.lineup.total - b.lineup.total);
+    return ordered
       .filter(
         ({ lineup }) =>
           words.length === 0 ||
@@ -201,7 +217,7 @@ export function PairingsView({ initialRoster }: { initialRoster: RosterResponse 
           }),
       )
       .slice(0, lineupLimit);
-  }, [myLineups, lineupFilter, lineupLimit]);
+  }, [lineupEvals, lineupSort, lineupFilter, lineupLimit]);
 
   const partnershipFor = (pair: NamePair) => {
     const p = byName.get(pair[0]);
@@ -453,19 +469,41 @@ export function PairingsView({ initialRoster }: { initialRoster: RosterResponse 
         {showAlternatives && (
           <div className="mt-3 border-t border-zinc-200 pt-2 dark:border-zinc-800">
             <div className="mb-1.5 flex flex-wrap items-center gap-2">
-              <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                Showing {Math.min(lineupLimit, myLineups.length)} of {myLineups.length} lineups,
-                strongest first. Changing it clears the recorded exchange.
-              </p>
+              <div className="flex rounded-md border border-zinc-300 text-[11px] dark:border-zinc-700">
+                {(["matches", "strokes"] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    onClick={() => setLineupSort(mode)}
+                    className={`px-2 py-1 first:rounded-l-md last:rounded-r-md ${
+                      lineupSort === mode
+                        ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                        : "text-zinc-600 dark:text-zinc-300"
+                    }`}
+                  >
+                    {mode === "matches" ? "Most matches won" : "Best total score"}
+                  </button>
+                ))}
+              </div>
               <input
                 value={lineupFilter}
                 onChange={(e) => setLineupFilter(e.target.value)}
                 placeholder="Keep a pair, e.g. Dave Tim"
-                className="ml-auto w-44 rounded-md border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-900"
+                className="ml-auto w-40 rounded-md border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-900"
               />
             </div>
+            <p className="mb-1.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+              Showing {visibleLineups.length} of {lineupEvals.length} lineups. Matches won assumes
+              both captains throw and counter optimally, so a lineup can&apos;t buy a soft draw by
+              sacrificing a pair — they choose who meets it. Changing your lineup clears the
+              recorded exchange.
+            </p>
             <ul className="flex max-h-96 flex-col gap-0.5 overflow-y-auto">
-              {visibleLineups.map(({ lineup, index }) => (
+              <li className="flex gap-2 px-2 text-[10px] uppercase tracking-wide text-zinc-400 dark:text-zinc-600">
+                <span className="w-8 shrink-0">Wins</span>
+                <span className="w-9 shrink-0">Score</span>
+                <span>Pairs</span>
+              </li>
+              {visibleLineups.map(({ lineup, index, matches }) => (
                 <li key={index}>
                   <button
                     onClick={() => {
@@ -478,8 +516,16 @@ export function PairingsView({ initialRoster }: { initialRoster: RosterResponse 
                         : "hover:bg-zinc-100 dark:hover:bg-zinc-900"
                     }`}
                   >
-                    <span className="w-6 shrink-0 tabular-nums opacity-50">{index + 1}</span>
-                    <span className="w-8 shrink-0 tabular-nums opacity-70">
+                    <span
+                      className="w-8 shrink-0 tabular-nums font-medium"
+                      title="Expected matches won of four"
+                    >
+                      {matches.toFixed(2)}
+                    </span>
+                    <span
+                      className="w-9 shrink-0 tabular-nums opacity-60"
+                      title="Total expected better-ball score across the four pairs"
+                    >
                       {lineup.total.toFixed(2)}
                     </span>
                     <span className="min-w-0 flex-1">
@@ -494,7 +540,7 @@ export function PairingsView({ initialRoster }: { initialRoster: RosterResponse 
                 </li>
               )}
             </ul>
-            {lineupLimit < myLineups.length && (
+            {lineupLimit < lineupEvals.length && (
               <button
                 onClick={() => setLineupLimit((n) => n + 25)}
                 className="mt-1.5 w-full rounded border border-zinc-300 py-1.5 text-xs text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"

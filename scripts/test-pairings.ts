@@ -8,6 +8,7 @@
  */
 
 import {
+  evaluateLineups,
   integrationBounds,
   netDistribution,
   pairDistribution,
@@ -106,6 +107,48 @@ const everyPlayerUsedOnce = lineups.every(
   (l) => new Set(l.pairs.flatMap((p) => p.players)).size === 8,
 );
 check("every lineup uses each player exactly once", everyPlayerUsedOnce ? 1 : 0, 1);
+
+// --- Match-play lineup evaluation ---------------------------------------------
+
+// Eight golfers split into two clear tiers, facing four even opponents.
+const tiered: PairingPlayer[] = [
+  ...Array.from({ length: 4 }, (_, i) => ({ name: `Good${i}`, handicapIndex: 5, adjustedGap: 1, spread: 3 })),
+  ...Array.from({ length: 4 }, (_, i) => ({ name: `Weak${i}`, handicapIndex: 25, adjustedGap: 6, spread: 3 })),
+];
+const foes: PairingPlayer[] = Array.from({ length: 8 }, (_, i) => ({
+  name: `Foe${i}`,
+  handicapIndex: 15,
+  adjustedGap: 3,
+  spread: 3,
+}));
+const foePairs: [string, string][] = [
+  ["Foe0", "Foe1"],
+  ["Foe2", "Foe3"],
+  ["Foe4", "Foe5"],
+  ["Foe6", "Foe7"],
+];
+const evals = evaluateLineups(tiered, foes, foePairs, course, "them");
+check("evaluateLineups covers all 105 lineups", evals.length, 105);
+check("evaluations are sorted by matches won", evals[0].matches >= evals[104].matches ? 1 : 0, 1);
+check("expected matches stay within [0, 4]", evals.every((e) => e.matches >= 0 && e.matches <= 4) ? 1 : 0, 1);
+// Selection is stored as an index into the stroke-ranked order, so re-sorting the view by
+// matches must not shift what an index refers to. Compared by content, not identity.
+const strokeOrder = rankLineups(tiered, course);
+const asNames = (l: (typeof strokeOrder)[number]) =>
+  l.pairs
+    .map((p) => [...p.players].sort().join("+"))
+    .sort()
+    .join(" ");
+check(
+  "indices point back at the stroke-ranked order",
+  evals.every((e) => asNames(e.lineup) === asNames(strokeOrder[e.index])) ? 1 : 0,
+  1,
+);
+// Stacking both strong players together wastes one of them: the lineup that pairs the
+// four good golfers into two pairs should not beat spreading them one per pair.
+const spread = evals.find((e) => e.lineup.pairs.every((p) => p.players.some((n) => n.startsWith("Good")) && p.players.some((n) => n.startsWith("Weak"))))!;
+const stacked = evals.find((e) => e.lineup.pairs.some((p) => p.players.every((n) => n.startsWith("Weak"))))!;
+check("spreading strength beats stacking it", spread.matches > stacked.matches ? 1 : 0, 1);
 
 console.log(failures === 0 ? "\nAll checks passed." : `\n${failures} check(s) failed.`);
 process.exit(failures === 0 ? 0 : 1);

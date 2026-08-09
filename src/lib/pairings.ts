@@ -188,6 +188,71 @@ export function rankLineups(team: PairingPlayer[], course: CourseRound): RankedL
     .sort((x, y) => x.total - y.total);
 }
 
+/** Stable key for a pair regardless of which partner is named first. */
+export const pairKey = (players: [string, string]): string => [...players].sort().join("|");
+
+export interface LineupEvaluation {
+  lineup: RankedLineup;
+  /** Index into the rankLineups order, so a selection survives re-sorting. */
+  index: number;
+  /** Expected matches won of four, under optimal throw-and-counter by both sides. */
+  matches: number;
+}
+
+/**
+ * Scores every lineup by the objective that actually decides the day: expected matches
+ * won, not total strokes.
+ *
+ * These come apart, and that's the whole point. Summing four pairs' expected scores is a
+ * stroke-play objective — it rewards a pair that wins by six exactly as much as the six
+ * strokes are worth, when match play pays the same single point for winning by one. So a
+ * lineup that concedes one match to make the other three strong can beat a balanced one
+ * on matches while looking far worse on strokes.
+ *
+ * Cheap because the 28 x 4 win probabilities are integrated once up front; each of the
+ * 105 lineups then only looks up its own 4 x 4 submatrix and searches a ~576-leaf tree.
+ */
+export function evaluateLineups(
+  team: PairingPlayer[],
+  opponents: PairingPlayer[],
+  theirPairs: [string, string][],
+  course: CourseRound,
+  firstThrow: Side,
+): LineupEvaluation[] {
+  const lineups = rankLineups(team, course);
+  if (lineups.length === 0 || theirPairs.length !== 4) return [];
+
+  const nets = new Map(
+    [...team, ...opponents].map((p) => [p.name, netDistribution(p, course)] as const),
+  );
+  if (theirPairs.flat().some((n) => !nets.has(n))) return [];
+
+  const bounds = integrationBounds([...nets.values()]);
+  const theirDists = theirPairs.map((p) => pairDistribution(nets.get(p[0])!, nets.get(p[1])!));
+
+  // One row of win probabilities per possible pair of mine, against their four.
+  const rowFor = new Map<string, number[]>();
+  for (const [a, b] of allPairs(team)) {
+    const mineDist = pairDistribution(nets.get(a.name)!, nets.get(b.name)!);
+    rowFor.set(
+      pairKey([a.name, b.name]),
+      theirDists.map((t) => winProbability(mineDist, t, bounds[0], bounds[1])),
+    );
+  }
+
+  const all = [0, 1, 2, 3];
+  return lineups
+    .map((lineup, index) => {
+      const winProb = lineup.pairs.map((p) => rowFor.get(pairKey(p.players))!);
+      const value = solveFromThrow(
+        { winProb },
+        { myRemaining: all, theirRemaining: all, pending: null, toThrow: firstThrow },
+      ).value;
+      return { lineup, index, matches: value };
+    })
+    .sort((x, y) => y.matches - x.matches);
+}
+
 // ---------------------------------------------------------------------------
 // The throw-and-counter draft
 // ---------------------------------------------------------------------------
