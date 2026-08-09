@@ -8,6 +8,7 @@
  */
 
 import {
+  createFreeSolver,
   evaluateLineups,
   integrationBounds,
   netDistribution,
@@ -149,6 +150,66 @@ check(
 const spread = evals.find((e) => e.lineup.pairs.every((p) => p.players.some((n) => n.startsWith("Good")) && p.players.some((n) => n.startsWith("Weak"))))!;
 const stacked = evals.find((e) => e.lineup.pairs.some((p) => p.players.every((n) => n.startsWith("Weak"))))!;
 check("spreading strength beats stacking it", spread.matches > stacked.matches ? 1 : 0, 1);
+
+// --- Free pairing -------------------------------------------------------------
+
+// Two identical teams: every pair is interchangeable, so every matchup is a coin flip and
+// the exchange is worth exactly half the matches however it is played.
+const clones = (prefix: string): PairingPlayer[] =>
+  Array.from({ length: 8 }, (_, i) => ({
+    name: `${prefix}${i}`,
+    handicapIndex: 12,
+    adjustedGap: 3,
+    spread: 3,
+  }));
+const mirrorA = clones("A");
+const mirrorB = clones("B");
+const mirror = createFreeSolver(mirrorA, mirrorB, course);
+const openState = {
+  myAvailable: mirrorA.map((p) => p.name),
+  theirAvailable: mirrorB.map((p) => p.name),
+  pending: null,
+};
+check("identical teams, they throw first", mirror.value({ ...openState, toThrow: "them" }), 2);
+check("identical teams, I throw first", mirror.value({ ...openState, toThrow: "me" }), 2);
+
+// The opening throw picks from every combination of eight, not from a fixed four.
+check("opening throw has 28 options", mirror.options({ ...openState, toThrow: "them" }).length, 28);
+
+// Walking the exchange, the option count follows C(8,2), C(6,2), C(4,2), C(2,2).
+const expectedCounts = [28, 28, 15, 15, 6, 6, 1, 1];
+let walk: Parameters<typeof mirror.options>[0] = { ...openState, toThrow: "them" };
+const seenCounts: number[] = [];
+for (let step = 0; step < 8; step++) {
+  const opts = mirror.options(walk);
+  if (opts.length === 0) break;
+  seenCounts.push(opts.length);
+  const actor = mirror.actor(walk);
+  const pool = actor === "me" ? walk.myAvailable : walk.theirAvailable;
+  const rest = pool.filter((n) => !opts[0].pair.includes(n));
+  const myAvailable = actor === "me" ? rest : walk.myAvailable;
+  const theirAvailable = actor === "them" ? rest : walk.theirAvailable;
+  walk = walk.pending
+    ? { myAvailable, theirAvailable, pending: null, toThrow: actor }
+    : { myAvailable, theirAvailable, pending: { pair: opts[0].pair, by: actor }, toThrow: actor };
+}
+check(
+  "option count shrinks 28/15/6/1 as golfers are used",
+  seenCounts.join(",") === expectedCounts.join(",") ? 1 : 0,
+  1,
+);
+
+// A team that outclasses its opponent should win nearly everything regardless of play.
+const strong = Array.from({ length: 8 }, (_, i) => ({ name: `S${i}`, handicapIndex: 2, adjustedGap: 0, spread: 1 }));
+const feeble = Array.from({ length: 8 }, (_, i) => ({ name: `F${i}`, handicapIndex: 2, adjustedGap: 20, spread: 1 }));
+const lopsided = createFreeSolver(strong, feeble, course);
+const lopsidedValue = lopsided.value({
+  myAvailable: strong.map((p) => p.name),
+  theirAvailable: feeble.map((p) => p.name),
+  pending: null,
+  toThrow: "them",
+});
+check("a far stronger team wins nearly all four", lopsidedValue, 4, 0.01);
 
 console.log(failures === 0 ? "\nAll checks passed." : `\n${failures} check(s) failed.`);
 process.exit(failures === 0 ? 0 : 1);

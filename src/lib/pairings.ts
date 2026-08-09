@@ -397,3 +397,180 @@ export function rankOptions(ctx: SolverContext, state: ThrowState): { index: num
     })
     .sort((a, b) => (actor === "me" ? b.value - a.value : a.value - b.value));
 }
+
+// ---------------------------------------------------------------------------
+// Free pairing — the game as it is actually played
+// ---------------------------------------------------------------------------
+
+/**
+ * Everything above assumes each captain fixes four pairs before the exchange starts.
+ * That isn't the format. A captain throws a pair built from whoever is still unpaired,
+ * so the opening throw chooses among all 28 combinations of eight golfers, then 15 of the
+ * remaining six, then 6, then the last two are forced. The lineup is an *output* of the
+ * exchange, not an input to it — and answering is stronger than it looks, because you
+ * build the answer around the pair already on the table.
+ *
+ * The raw tree is ~6.4M leaves. Its value depends only on which golfers remain and which
+ * pair is on the table — not on how the used ones happened to be arranged — so memoising
+ * on that collapses it to a few thousand states. Availability is a bitmask and the whole
+ * state packs into one integer, which keeps the search allocation-free and well under a
+ * frame; the string-keyed version of this took about 1.5 seconds.
+ */
+export interface FreeState {
+  /** Golfers not yet used. */
+  myAvailable: string[];
+  theirAvailable: string[];
+  /** The pair awaiting an answer, already removed from its owner's available list. */
+  pending: { pair: [string, string]; by: Side } | null;
+  /** Whose throw it is when nothing is pending. */
+  toThrow: Side;
+}
+
+interface IndexedPair {
+  id: number;
+  mask: number;
+  players: [string, string];
+}
+
+export interface FreeSolver {
+  /** Which side is to play. */
+  actor: (state: FreeState) => Side;
+  /** Expected matches won by me over the rest of the exchange, both sides playing well. */
+  value: (state: FreeState) => number;
+  /** Every legal play now, best for the acting side first. */
+  options: (state: FreeState) => { pair: [string, string]; value: number }[];
+  /** P(my pair beats theirs), for display. */
+  win: (mine: [string, string], theirs: [string, string]) => number;
+}
+
+const NO_PENDING = 0;
+
+export function createFreeSolver(
+  team: PairingPlayer[],
+  opponents: PairingPlayer[],
+  course: CourseRound,
+): FreeSolver {
+  const myNames = team.map((p) => p.name);
+  const theirNames = opponents.map((p) => p.name);
+  const bit = (names: string[]) => new Map(names.map((n, i) => [n, 1 << i]));
+  const myBit = bit(myNames);
+  const theirBit = bit(theirNames);
+
+  const index = (names: string[], bits: Map<string, number>): IndexedPair[] =>
+    allPairs(names).map(([a, b], id) => ({ id, mask: bits.get(a)! | bits.get(b)!, players: [a, b] }));
+  const myPairs = index(myNames, myBit);
+  const theirPairs = index(theirNames, theirBit);
+  const myById = new Map(myPairs.map((p) => [pairKey(p.players), p]));
+  const theirById = new Map(theirPairs.map((p) => [pairKey(p.players), p]));
+
+  const nets = new Map([...team, ...opponents].map((p) => [p.name, netDistribution(p, course)] as const));
+  const [lo, hi] = integrationBounds([...nets.values()]);
+  const dist = (p: IndexedPair) => pairDistribution(nets.get(p.players[0])!, nets.get(p.players[1])!);
+  const myDist = myPairs.map(dist);
+  const theirDist = theirPairs.map(dist);
+
+  const width = theirPairs.length;
+  const winTable = new Float64Array(myPairs.length * width);
+  for (const m of myPairs) {
+    for (const t of theirPairs) {
+      winTable[m.id * width + t.id] = winProbability(myDist[m.id], theirDist[t.id], lo, hi);
+    }
+  }
+
+  const memo = new Map<number, number>();
+
+  /**
+   * `pending` is 0 for none, otherwise the pair id plus one; `pendingBy` only matters when
+   * something is pending, and doubles as "whose throw" when nothing is.
+   */
+  function search(myMask: number, theirMask: number, pending: number, pendingBy: Side): number {
+    const key = myMask | (theirMask << 8) | (pending << 16) | (pendingBy === "me" ? 1 << 22 : 0);
+    const cached = memo.get(key);
+    if (cached !== undefined) return cached;
+
+    const answering = pending !== NO_PENDING;
+    const actor: Side = answering ? (pendingBy === "me" ? "them" : "me") : pendingBy;
+    const mine = actor === "me";
+    const pool = mine ? myPairs : theirPairs;
+    const poolMask = mine ? myMask : theirMask;
+
+    let best = mine ? -Infinity : Infinity;
+    for (const choice of pool) {
+      if ((choice.mask & poolMask) !== choice.mask) continue; // a golfer already used
+      const nextMy = mine ? myMask & ~choice.mask : myMask;
+      const nextTheir = mine ? theirMask : theirMask & ~choice.mask;
+
+      let value: number;
+      if (answering) {
+        const settled = mine
+          ? winTable[choice.id * width + (pending - 1)]
+          : winTable[(pending - 1) * width + choice.id];
+        value =
+          nextMy === 0 && nextTheir === 0
+            ? settled
+            : settled + search(nextMy, nextTheir, NO_PENDING, actor);
+      } else {
+        value = search(nextMy, nextTheir, choice.id + 1, actor);
+      }
+
+      if (mine ? value > best : value < best) best = value;
+    }
+
+    const result = best === Infinity || best === -Infinity ? 0 : best;
+    memo.set(key, result);
+    return result;
+  }
+
+  const maskOf = (names: string[], bits: Map<string, number>) =>
+    names.reduce((mask, n) => mask | (bits.get(n) ?? 0), 0);
+
+  const decode = (state: FreeState) => ({
+    myMask: maskOf(state.myAvailable, myBit),
+    theirMask: maskOf(state.theirAvailable, theirBit),
+    pending: state.pending
+      ? ((state.pending.by === "me" ? myById : theirById).get(pairKey(state.pending.pair))?.id ?? -1) + 1
+      : NO_PENDING,
+    pendingBy: state.pending ? state.pending.by : state.toThrow,
+  });
+
+  const actorOf = (state: FreeState): Side =>
+    state.pending ? (state.pending.by === "me" ? "them" : "me") : state.toThrow;
+
+  return {
+    actor: actorOf,
+    win: (mine, theirs) =>
+      winTable[myById.get(pairKey(mine))!.id * width + theirById.get(pairKey(theirs))!.id],
+    value: (state) => {
+      const { myMask, theirMask, pending, pendingBy } = decode(state);
+      return search(myMask, theirMask, pending, pendingBy);
+    },
+    options: (state) => {
+      const { myMask, theirMask, pending } = decode(state);
+      const actor = actorOf(state);
+      const mine = actor === "me";
+      const pool = mine ? myPairs : theirPairs;
+      const poolMask = mine ? myMask : theirMask;
+
+      return pool
+        .filter((c) => (c.mask & poolMask) === c.mask)
+        .map((choice) => {
+          const nextMy = mine ? myMask & ~choice.mask : myMask;
+          const nextTheir = mine ? theirMask : theirMask & ~choice.mask;
+          if (pending === NO_PENDING) {
+            return { pair: choice.players, value: search(nextMy, nextTheir, choice.id + 1, actor) };
+          }
+          const settled = mine
+            ? winTable[choice.id * width + (pending - 1)]
+            : winTable[(pending - 1) * width + choice.id];
+          return {
+            pair: choice.players,
+            value:
+              nextMy === 0 && nextTheir === 0
+                ? settled
+                : settled + search(nextMy, nextTheir, NO_PENDING, actor),
+          };
+        })
+        .sort((x, y) => (mine ? y.value - x.value : x.value - y.value));
+    },
+  };
+}
