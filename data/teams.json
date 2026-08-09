@@ -1,0 +1,23 @@
+{
+  "_comment": "Final drafted teams. Captains are listed first and were never drafted — see draft.json. This is the source of truth for the pairings page so it works on any device, independent of the draft board's browser-local state.",
+  "A": [
+    "Paul Schappell",
+    "Sean Dainese",
+    "Aaron Maize",
+    "Mark Boardman",
+    "Pat Coughlin",
+    "Alex Smith",
+    "Ben McClure",
+    "Nate ZImmel"
+  ],
+  "B": [
+    "Stephen Ebeck",
+    "Dave McLean",
+    "Jared Fincke",
+    "Craig Zimmerman",
+    "Tim Onushco",
+    "Dan Cosentino",
+    "Matt Kujava",
+    "Phil Bortz"
+  ]
+}

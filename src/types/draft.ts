@@ -1,3 +1,4 @@
+import type { CoursesConfig } from "@/lib/course-math";
 import type { CaptainId, DraftConfig } from "@/lib/draft";
 import type { Partnership, Record3 } from "@/lib/cup-history";
 import type { TrendResult } from "@/lib/trend";
@@ -51,6 +52,8 @@ export interface RosterPlayer {
   upsideBestBall: number;
   /** Round-to-round spread, shrunk toward the field for small samples. */
   spread: number;
+  /** Personal shortfall vs. index after shrinking toward the field — drives net scoring. */
+  adjustedGap: number;
   /** Average Course Handicap across the event's 3 rounds, given the actual course slopes. */
   eventCourseHandicap: number;
   trend: TrendResult | null;
@@ -73,6 +76,10 @@ export interface RosterResponse {
   fieldGap?: number;
   /** Draft pick order and captain names. */
   draft?: DraftConfig;
+  /** Final drafted teams, captain first. Used by the pairings page. */
+  teams?: Record<CaptainId, string[]>;
+  /** The event's rounds, with tees/rating/slope — the pairings page scores per course. */
+  courses?: CoursesConfig;
   /** Set when the whole roster load failed (e.g. workbook missing/unreadable). */
   error?: string;
 }

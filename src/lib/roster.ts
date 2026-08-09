@@ -8,17 +8,19 @@ import {
 } from "./cup-history";
 import { loadDraftConfig } from "./draft-config";
 import { computeRankings, median } from "./ranking";
+import { loadTeams } from "./teams";
 import { computeTrend } from "./trend";
 import { loadWorkbookData } from "./workbook";
 import type { PlayerRound, RosterPlayer, RosterResponse } from "@/types/draft";
 
 export async function getRoster(): Promise<RosterResponse> {
   try {
-    const [{ rounds, summary }, courses, draft, cupHistory] = await Promise.all([
+    const [{ rounds, summary }, courses, draft, cupHistory, teams] = await Promise.all([
       loadWorkbookData(),
       loadCoursesConfig(),
       loadDraftConfig(),
       loadCupHistory(),
+      loadTeams(),
     ]);
 
     const partnershipsFor = (name: string): Partnership[] =>
@@ -78,6 +80,7 @@ export async function getRoster(): Promise<RosterResponse> {
         expectedNetBestBall: r.expectedNetBestBall,
         upsideBestBall: r.upsideBestBall,
         spread: r.spread,
+        adjustedGap: r.adjustedGap,
         eventCourseHandicap: computeEventCourseHandicap(s.handicapIndex, courses),
         trend: computeTrend(s.handicapIndex, differentialsFor(s.name), fieldGap),
         rounds: playerRounds,
@@ -104,7 +107,7 @@ export async function getRoster(): Promise<RosterResponse> {
       };
     });
 
-    return { players, fetchedAt: new Date().toISOString(), fieldGap, draft };
+    return { players, fetchedAt: new Date().toISOString(), fieldGap, draft, teams, courses };
   } catch (err) {
     return { players: [], fetchedAt: new Date().toISOString(), error: (err as Error).message };
   }
