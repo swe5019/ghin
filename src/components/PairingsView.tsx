@@ -256,8 +256,16 @@ export function PairingsView({ initialRoster }: { initialRoster: RosterResponse 
                     ? "They answer your pair"
                     : "They throw"}
               </p>
-              <p className="text-xs text-emerald-800 dark:text-emerald-300">
-                projected {live.decision?.value.toFixed(2)} of 4 from here
+              {/* The solver only values the matches still to be set, so settled ones are
+                  added back in — otherwise the total shrinks as the exchange goes on. */}
+              <p className="text-right text-xs text-emerald-800 dark:text-emerald-300">
+                projected {(live.pointsSoFar + (live.decision?.value ?? 0)).toFixed(2)} of 4
+                {live.matches.length > 0 && (
+                  <span className="block opacity-75">
+                    {live.pointsSoFar.toFixed(2)} settled · {live.decision?.value.toFixed(2)} still
+                    to play
+                  </span>
+                )}
               </p>
             </div>
 
