@@ -37,6 +37,8 @@ export function PairingsView({ initialRoster }: { initialRoster: RosterResponse 
   const [courseIdx, setCourseIdx] = useState(0);
   const [myLineupIdx, setMyLineupIdx] = useState(0);
   const [showAlternatives, setShowAlternatives] = useState(false);
+  const [lineupLimit, setLineupLimit] = useState(25);
+  const [lineupFilter, setLineupFilter] = useState("");
   const [firstThrow, setFirstThrow] = useState<Side>("them");
   const [events, setEvents] = useState<DraftEvent[]>([]);
   const [picking, setPicking] = useState<string[]>([]);
@@ -179,6 +181,27 @@ export function PairingsView({ initialRoster }: { initialRoster: RosterResponse 
 
     return { state, actor, decision, options, matches, done, pointsSoFar: matches.reduce((s, m) => s + model.winProb[m.mine][m.theirs], 0) };
   }, [model, events, firstThrow, myPairs, theirPairs]);
+
+  // The alternatives list is a menu, so it shows plenty and grows on demand rather than
+  // cutting off at an arbitrary handful.
+  //
+  // Filtering matches a single PAIR against every word typed, not the lineup as a whole —
+  // every lineup contains all eight golfers, so one name alone would match all 105. Two
+  // names ("dave tim") narrows to the lineups that actually put those two together.
+  const visibleLineups = useMemo(() => {
+    const words = lineupFilter.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    return myLineups
+      .map((lineup, index) => ({ lineup, index }))
+      .filter(
+        ({ lineup }) =>
+          words.length === 0 ||
+          lineup.pairs.some((p) => {
+            const names = p.players.join(" ").toLowerCase();
+            return words.every((w) => names.includes(w));
+          }),
+      )
+      .slice(0, lineupLimit);
+  }, [myLineups, lineupFilter, lineupLimit]);
 
   const partnershipFor = (pair: NamePair) => {
     const p = byName.get(pair[0]);
@@ -428,31 +451,58 @@ export function PairingsView({ initialRoster }: { initialRoster: RosterResponse 
         </ul>
 
         {showAlternatives && (
-          <ul className="mt-3 flex flex-col gap-1 border-t border-zinc-200 pt-2 dark:border-zinc-800">
-            {myLineups.slice(0, 10).map((lineup, i) => (
-              <li key={i}>
-                <button
-                  onClick={() => {
-                    setMyLineupIdx(i);
-                    setEvents([]);
-                  }}
-                  className={`w-full rounded px-2 py-1.5 text-left text-xs ${
-                    i === myLineupIdx
-                      ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                      : "hover:bg-zinc-100 dark:hover:bg-zinc-900"
-                  }`}
-                >
-                  <span className="tabular-nums opacity-70">{lineup.total.toFixed(2)}</span>{" "}
-                  {lineup.pairs.map((p) => label(p.players)).join(" · ")}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-        {showAlternatives && (
-          <p className="mt-2 text-[11px] text-zinc-500 dark:text-zinc-400">
-            Changing your lineup clears the recorded exchange.
-          </p>
+          <div className="mt-3 border-t border-zinc-200 pt-2 dark:border-zinc-800">
+            <div className="mb-1.5 flex flex-wrap items-center gap-2">
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                Showing {Math.min(lineupLimit, myLineups.length)} of {myLineups.length} lineups,
+                strongest first. Changing it clears the recorded exchange.
+              </p>
+              <input
+                value={lineupFilter}
+                onChange={(e) => setLineupFilter(e.target.value)}
+                placeholder="Keep a pair, e.g. Dave Tim"
+                className="ml-auto w-44 rounded-md border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-900"
+              />
+            </div>
+            <ul className="flex max-h-96 flex-col gap-0.5 overflow-y-auto">
+              {visibleLineups.map(({ lineup, index }) => (
+                <li key={index}>
+                  <button
+                    onClick={() => {
+                      setMyLineupIdx(index);
+                      setEvents([]);
+                    }}
+                    className={`flex w-full items-baseline gap-2 rounded px-2 py-1.5 text-left text-xs ${
+                      index === myLineupIdx
+                        ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                        : "hover:bg-zinc-100 dark:hover:bg-zinc-900"
+                    }`}
+                  >
+                    <span className="w-6 shrink-0 tabular-nums opacity-50">{index + 1}</span>
+                    <span className="w-8 shrink-0 tabular-nums opacity-70">
+                      {lineup.total.toFixed(2)}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      {lineup.pairs.map((p) => label(p.players)).join(" · ")}
+                    </span>
+                  </button>
+                </li>
+              ))}
+              {visibleLineups.length === 0 && (
+                <li className="px-2 py-3 text-xs text-zinc-400 dark:text-zinc-600">
+                  No lineup puts {lineupFilter.trim()} together.
+                </li>
+              )}
+            </ul>
+            {lineupLimit < myLineups.length && (
+              <button
+                onClick={() => setLineupLimit((n) => n + 25)}
+                className="mt-1.5 w-full rounded border border-zinc-300 py-1.5 text-xs text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+              >
+                Show 25 more
+              </button>
+            )}
+          </div>
         )}
       </section>
 

@@ -128,6 +128,25 @@ export interface Pair {
   expected: number;
 }
 
+/**
+ * Every two-man combination on a team — 28 for eight players. Unlike enumeratePairings
+ * these overlap, since it's the menu a captain picks from rather than a whole lineup.
+ */
+export function allPairs<T>(items: T[]): [T, T][] {
+  return items.flatMap((a, i) => items.slice(i + 1).map((b) => [a, b] as [T, T]));
+}
+
+/** Scores every two-man combination on a team at one course, best better-ball first. */
+export function rankAllPairs(team: PairingPlayer[], course: CourseRound): Pair[] {
+  const nets = new Map(team.map((p) => [p.name, netDistribution(p, course)]));
+  return allPairs(team)
+    .map(([a, b]) => ({
+      players: [a.name, b.name] as [string, string],
+      expected: pairDistribution(nets.get(a.name)!, nets.get(b.name)!).expected,
+    }))
+    .sort((x, y) => x.expected - y.expected);
+}
+
 /** Every way to split a team into unordered pairs — 105 of them for eight players. */
 export function enumeratePairings<T>(items: T[]): [T, T][][] {
   if (items.length === 0) return [[]];
