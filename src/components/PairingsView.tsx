@@ -268,6 +268,13 @@ export function PairingsView({ initialRoster }: { initialRoster: RosterResponse 
                     />
                   )}
                 </div>
+                {/* Two bare numbers side by side read as one measure in two units. They
+                    aren't: one is the whole day, the other is this match alone. */}
+                <div className="mb-1 flex items-baseline gap-2 pr-3 pl-3 text-[10px] uppercase tracking-wide text-emerald-700 dark:text-emerald-500">
+                  <span className="flex-1">Pair</span>
+                  <span className="w-10 text-right">of 4</span>
+                  {live.state.pending && <span className="w-10 text-right">this match</span>}
+                </div>
                 <ul className="flex max-h-80 flex-col gap-1 overflow-y-auto">
                   {visibleOptions.map((opt, rank) => {
                     const record = partnershipFor(opt.pair);
@@ -298,10 +305,18 @@ export function PairingsView({ initialRoster }: { initialRoster: RosterResponse 
                               </span>
                             )}
                           </span>
-                          <span className="shrink-0 tabular-nums text-zinc-500 dark:text-zinc-400">
-                            {(live.settled + opt.value).toFixed(2)}
+                          <span className="flex shrink-0 items-baseline gap-2 tabular-nums">
+                            <span
+                              className="w-10 text-right text-zinc-500 dark:text-zinc-400"
+                              title="Projected matches won across all four, if both captains keep playing well"
+                            >
+                              {(live.settled + opt.value).toFixed(2)}
+                            </span>
                             {live.state.pending && (
-                              <span className="ml-2 text-emerald-700 dark:text-emerald-400">
+                              <span
+                                className="w-10 text-right text-emerald-700 dark:text-emerald-400"
+                                title={`Chance this pair beats ${label(live.state.pending.pair)} — this match only`}
+                              >
                                 {(solver.win(opt.pair, live.state.pending.pair) * 100).toFixed(0)}%
                               </span>
                             )}
@@ -438,8 +453,11 @@ export function PairingsView({ initialRoster }: { initialRoster: RosterResponse 
       )}
 
       <p className="text-[11px] leading-relaxed text-zinc-400 dark:text-zinc-600">
-        Win % is each pair&apos;s share of the head-to-head, from expected net scores at this
-        course. Four-ball here takes the better of two round totals, while the real format takes
+        &ldquo;Of 4&rdquo; is the projected matches won across the whole exchange, so it already
+        prices what a pair costs you later — a pair can win this match more often and still total
+        less, because it spends golfers the last two matches then go without. &ldquo;This
+        match&rdquo; is that pair&apos;s share of the head-to-head in front of it, from expected
+        net scores at this course. Four-ball here takes the better of two round totals, while the real format takes
         the better ball on every hole — so these understate how much a partner helps. Halved
         matches aren&apos;t modelled. See the All pairings tab for every combination side by side.
       </p>
