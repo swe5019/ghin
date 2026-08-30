@@ -16,6 +16,12 @@ import type { RosterPlayer, RosterResponse } from "@/types/draft";
 const first = (name: string) => name.split(" ")[0];
 const label = (pair: [string, string]) => `${first(pair[0])} + ${first(pair[1])}`;
 
+/** Quotes a CSV field only when it needs it, so the output stays readable in a text editor. */
+function csvField(value: string | number): string {
+  const text = String(value);
+  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
 /**
  * Diverging fill around an even match. The base surface is a CSS variable so one
  * expression works in both themes — see the token block on the wrapper below.
@@ -31,6 +37,7 @@ export function MatrixView({ initialRoster }: { initialRoster: RosterResponse })
   const [courseIdx, setCourseIdx] = useState(0);
   const [highlight, setHighlight] = useState<string | null>(null);
   const [selected, setSelected] = useState<[number, number] | null>(null);
+  const [copied, setCopied] = useState(false);
 
   // GitHub Pages caches the HTML, so re-read the data on mount rather than trusting
   // whatever was baked into this bundle.
@@ -100,6 +107,57 @@ export function MatrixView({ initialRoster }: { initialRoster: RosterResponse })
 
   const dimRow = (p: Pair) => highlight !== null && myNames.includes(highlight) && !p.players.includes(highlight);
   const dimCol = (p: Pair) => highlight !== null && theirNames.includes(highlight) && !p.players.includes(highlight);
+
+  // A plain CSV so it drops straight into the group's spreadsheet. Grid first, since that's
+  // the thing worth sharing, then each side's pairs with their expected better ball.
+  const buildCsv = (): string => {
+    const rows: string[] = [];
+    rows.push(`Barnard Cup four-ball head-to-head — ${course.round}, ${course.course}`);
+    rows.push(`${course.tees} tees · rating ${course.rating} · slope ${course.slope} · par ${course.par} · ${Math.round(course.allowancePct * 100)}% allowance`);
+    rows.push("Each cell is the chance the row pair posts the lower better ball.");
+    rows.push("");
+    rows.push(["Us \\ them", ...theirs.map((p) => label(p.players))].map(csvField).join(","));
+    mine.forEach((mp, i) => {
+      rows.push([label(mp.players), ...matrix[i].map((v) => `${v}%`)].map(csvField).join(","));
+    });
+    rows.push("");
+    rows.push("Our pairs,Expected net to par,,Their pairs,Expected net to par");
+    const longest = Math.max(mine.length, theirs.length);
+    for (let i = 0; i < longest; i++) {
+      rows.push(
+        [
+          mine[i] ? label(mine[i].players) : "",
+          mine[i] ? mine[i].expected.toFixed(2) : "",
+          "",
+          theirs[i] ? label(theirs[i].players) : "",
+          theirs[i] ? theirs[i].expected.toFixed(2) : "",
+        ]
+          .map(csvField)
+          .join(","),
+      );
+    }
+    return rows.join("\n");
+  };
+
+  const downloadCsv = () => {
+    const blob = new Blob([buildCsv()], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `bc-pairings-${course.round.toLowerCase().replace(/\s+/g, "-")}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const copyCsv = async () => {
+    try {
+      await navigator.clipboard.writeText(buildCsv());
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard access can be refused; the download button still works.
+    }
+  };
 
   const readout = selected
     ? {
@@ -226,12 +284,28 @@ export function MatrixView({ initialRoster }: { initialRoster: RosterResponse })
       </div>
 
       <section className="flex flex-col gap-2">
-        <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">
-          Head-to-head — {total} matchups
-        </h2>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">
+            Head-to-head — {total} matchups
+          </h2>
+          <div className="flex gap-1.5">
+            <button
+              onClick={() => void copyCsv()}
+              className="rounded-md border border-zinc-300 px-2.5 py-1 text-xs text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+            >
+              {copied ? "Copied" : "Copy"}
+            </button>
+            <button
+              onClick={downloadCsv}
+              className="rounded-md bg-zinc-900 px-2.5 py-1 text-xs font-medium text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+            >
+              Download CSV
+            </button>
+          </div>
+        </div>
         <p className="text-xs text-zinc-500 dark:text-zinc-400">
           Each cell is the chance your pair (row) posts the lower better ball. Read down a column to
-          see what beats a pair they might throw.
+          see what beats a pair they might throw. Copy or download to share this round&apos;s grid.
         </p>
 
         <div className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-800 dark:bg-zinc-950">
