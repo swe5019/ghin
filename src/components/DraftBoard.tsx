@@ -23,6 +23,9 @@ function loadDraftState(): DraftState {
 
 type SortMode = "overall" | "bestBall" | "singles" | "trend" | "index" | "name";
 
+/** Which players the ranked list shows. */
+type ListView = "pool" | "mine" | "theirs" | "all";
+
 const SORT_LABELS: Record<SortMode, string> = {
   overall: "Overall",
   bestBall: "Best ball",
@@ -34,6 +37,13 @@ const SORT_LABELS: Record<SortMode, string> = {
 
 const TREND_ORDER: Record<string, number> = { hot: 0, steady: 1, cold: 2, insufficient_data: 3 };
 
+const VIEW_LABELS: Record<ListView, string> = {
+  pool: "Available",
+  mine: "My team",
+  theirs: "Their team",
+  all: "Everyone",
+};
+
 export function DraftBoard({ initialRoster }: { initialRoster: RosterResponse }) {
   const [roster, setRoster] = useState<RosterPlayer[]>(initialRoster.players);
   const [fetchedAt, setFetchedAt] = useState<string | null>(initialRoster.fetchedAt);
@@ -44,6 +54,9 @@ export function DraftBoard({ initialRoster }: { initialRoster: RosterResponse })
   const [expanded, setExpanded] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<SortMode>("overall");
   const [filterText, setFilterText] = useState("");
+  // Which slice of the field the ranked list shows. Null means "follow the draft" — the
+  // pool while picks remain, everyone once they're all gone.
+  const [viewOverride, setViewOverride] = useState<ListView | null>(null);
 
   // Draft picks are undefined until mount (SSR has no localStorage); picks only render
   // once hydrated, so there's no server/client markup mismatch.
@@ -137,8 +150,20 @@ export function DraftBoard({ initialRoster }: { initialRoster: RosterResponse })
 
   const teamOf = (name: string): TeamId => captainOf(name) ?? assignments[name] ?? "pool";
 
-  const pool = useMemo(() => {
-    let players = roster.filter((p) => teamOf(p.name) === "pool");
+  // Once every pick is in, an "available only" list is empty and the page looks frozen —
+  // the ranks, form and round histories all live in these rows. So the list falls back to
+  // the whole field when the draft is done, and can be switched by hand at any point.
+  const draftComplete = pickHistory.length >= pickOrder.length && pickOrder.length > 0;
+  const view: ListView = viewOverride ?? (draftComplete ? "all" : "pool");
+
+  const listed = useMemo(() => {
+    const matches = (name: string) => {
+      const team = teamOf(name);
+      if (view === "all") return true;
+      if (view === "pool") return team === "pool";
+      return team === (view === "mine" ? myCaptain : myCaptain === "A" ? "B" : "A");
+    };
+    let players = roster.filter((p) => matches(p.name));
 
     if (filterText.trim()) {
       const q = filterText.trim().toLowerCase();
@@ -165,7 +190,7 @@ export function DraftBoard({ initialRoster }: { initialRoster: RosterResponse })
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roster, assignments, filterText, sortMode]);
+  }, [roster, assignments, filterText, sortMode, view, myCaptain, captains]);
 
   // The captain heads their own list, then their picks in the order they made them. A captain
   // missing from the roster (name typo in draft.json) just yields a captainless list.
@@ -242,7 +267,10 @@ export function DraftBoard({ initialRoster }: { initialRoster: RosterResponse })
         <div>
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">
-              Available <span className="text-sm font-normal text-zinc-500 dark:text-zinc-400">({pool.length})</span>
+              {VIEW_LABELS[view]}{" "}
+              <span className="text-sm font-normal text-zinc-500 dark:text-zinc-400">
+                ({listed.length})
+              </span>
             </h2>
             <input
               value={filterText}
@@ -263,21 +291,43 @@ export function DraftBoard({ initialRoster }: { initialRoster: RosterResponse })
             </select>
           </div>
 
+          <div className="mb-2 flex flex-wrap gap-1">
+            {(Object.keys(VIEW_LABELS) as ListView[]).map((v) => (
+              <button
+                key={v}
+                onClick={() => setViewOverride(v)}
+                className={`rounded-md px-2.5 py-1 text-xs ${
+                  v === view
+                    ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                    : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+                }`}
+              >
+                {VIEW_LABELS[v]}
+              </button>
+            ))}
+          </div>
+
           <div className="flex flex-col gap-2">
-            {pool.length === 0 && (
+            {listed.length === 0 && (
               <p className="rounded-lg border border-dashed border-zinc-300 py-8 text-center text-sm text-zinc-400 dark:border-zinc-700 dark:text-zinc-600">
-                {roster.length === 0 ? "No roster data loaded." : "Everyone's been drafted."}
+                {roster.length === 0
+                  ? "No roster data loaded."
+                  : view === "pool"
+                    ? "Everyone's been drafted — switch to Everyone to keep reading the field."
+                    : "Nobody here yet."}
               </p>
             )}
-            {pool.map((p) => (
+            {listed.map((p) => (
               <PlayerRow
                 key={p.name}
                 player={p}
                 expanded={expanded === p.name}
                 onToggle={() => setExpanded(expanded === p.name ? null : p.name)}
-                onDraft={(captain) => draftPlayer(p.name, captain)}
+                // Only undrafted players can be picked; the rest are shown for reference.
+                onDraft={teamOf(p.name) === "pool" ? (captain) => draftPlayer(p.name, captain) : undefined}
                 captains={captains}
                 onTheClock={onTheClock}
+                team={teamOf(p.name) === "pool" ? null : captains[teamOf(p.name) as CaptainId]}
               />
             ))}
           </div>

@@ -24,6 +24,7 @@ export function PlayerRow({
   onDraft,
   captains,
   onTheClock,
+  team,
 }: {
   player: RosterPlayer;
   expanded: boolean;
@@ -31,6 +32,8 @@ export function PlayerRow({
   onDraft?: (captain: CaptainId) => void;
   captains?: Record<CaptainId, string>;
   onTheClock?: CaptainId | null;
+  /** Whose team they're on, when the list is showing more than the undrafted pool. */
+  team?: string | null;
 }) {
   return (
     <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
@@ -50,6 +53,11 @@ export function PlayerRow({
             <span className="flex items-center gap-2">
               <span className="truncate font-medium text-zinc-900 dark:text-zinc-100">{player.name}</span>
               <TrendBadge trend={player.trend} />
+              {team && (
+                <span className="shrink-0 rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                  {team.split(" ")[0]}
+                </span>
+              )}
             </span>
             <span className="mt-0.5 block text-xs text-zinc-500 dark:text-zinc-400">
               {formatHandicapIndex(player.handicapIndex)} index · plays to{" "}
