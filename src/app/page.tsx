@@ -1,5 +1,6 @@
 import { DraftBoard } from "@/components/DraftBoard";
 import { NavTabs } from "@/components/NavTabs";
+import { UpdateBanner } from "@/components/UpdateBanner";
 import { getRoster } from "@/lib/roster";
 
 // Static export (GitHub Pages) - data/BCIV_Draft.xlsx is read once at build time here.
@@ -9,6 +10,7 @@ export default async function Home() {
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black">
+      <UpdateBanner />
       <NavTabs active="/" />
       <DraftBoard initialRoster={initialRoster} />
     </div>

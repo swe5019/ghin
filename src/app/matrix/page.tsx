@@ -1,5 +1,6 @@
 import { MatrixView } from "@/components/MatrixView";
 import { NavTabs } from "@/components/NavTabs";
+import { UpdateBanner } from "@/components/UpdateBanner";
 import { getRoster } from "@/lib/roster";
 
 // Static export, same as the other pages — rebuilt whenever the roster syncs.
@@ -8,6 +9,7 @@ export default async function MatrixPage() {
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black">
+      <UpdateBanner />
       <NavTabs active="/matrix" />
       <MatrixView initialRoster={roster} />
     </div>
