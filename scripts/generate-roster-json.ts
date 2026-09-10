@@ -13,6 +13,7 @@
 import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import { getRoster } from "../src/lib/roster";
+import { loadWorkbookData } from "../src/lib/workbook";
 
 /** A commit is the most meaningful build identity in CI; a timestamp works locally. */
 function buildId(): string {
@@ -33,6 +34,21 @@ async function main() {
 
   const rounds = roster.players.reduce((sum, p) => sum + p.roundsLogged, 0);
   console.log(`Wrote ${rosterPath} (${roster.players.length} players, ${rounds} rounds), build ${id}`);
+
+  // A round whose golfer matches nobody just vanishes, and the roster still looks healthy -
+  // that's how two of Nate's rounds went missing behind a stray capital letter. Say so
+  // loudly instead, since the fix is a one-character edit in the workbook.
+  const { rounds: logged } = await loadWorkbookData();
+  const known = new Set(roster.players.map((p) => p.name.trim().toLowerCase()));
+  const orphans = [...new Set(logged.map((r) => r.golferName))].filter(
+    (n) => !known.has(n.trim().toLowerCase()),
+  );
+  if (orphans.length > 0) {
+    console.warn(`WARNING: Round Log names with no Golfer Summary row: ${orphans.join(", ")}`);
+  }
+  if (rounds !== logged.length) {
+    console.warn(`WARNING: parsed ${logged.length} rounds but only ${rounds} reached a player.`);
+  }
 }
 
 main().catch((err) => {

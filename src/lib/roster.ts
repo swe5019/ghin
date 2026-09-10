@@ -28,7 +28,20 @@ export async function getRoster(): Promise<RosterResponse> {
         .filter((p) => p.pair.includes(name))
         .sort((a, b) => b.w + 0.5 * b.h - (a.w + 0.5 * a.h) || b.g - a.g);
 
-    const roundsFor = (name: string) => rounds.filter((r) => r.golferName === name);
+    // The two sheets are typed by hand and don't always agree on capitalisation - the Round
+    // Log says "Nate Zimmel" where the Golfer Summary says "Nate ZImmel". Excel's own
+    // COUNTIF is case-insensitive, so the workbook tallies him correctly while an exact
+    // match here silently credited him with no rounds at all. Join the way Excel does.
+    const nameKey = (name: string) => name.trim().toLowerCase();
+    const roundsByGolfer = new Map<string, typeof rounds>();
+    for (const round of rounds) {
+      const key = nameKey(round.golferName);
+      const existing = roundsByGolfer.get(key);
+      if (existing) existing.push(round);
+      else roundsByGolfer.set(key, [round]);
+    }
+
+    const roundsFor = (name: string) => roundsByGolfer.get(nameKey(name)) ?? [];
     const differentialsFor = (name: string) => roundsFor(name).map((r) => r.differential);
 
     const bestBallRounds = courses.rounds.filter(isBestBall);
